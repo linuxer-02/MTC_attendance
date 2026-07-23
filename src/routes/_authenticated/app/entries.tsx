@@ -69,7 +69,7 @@ function RegisterEntriesPage() {
   const [classId, setClassId] = useState<string | null>(search.classId ?? null);
   const [selectedDate, setSelectedDate] = useState<string>(search.date ?? todayISO());
   const [selectedMonth, setSelectedMonth] = useState<string>(
-    search.month ?? format(new Date(), "yyyy-MM")
+    search.month ?? format(new Date(), "yyyy-MM"),
   );
 
   // Set default class if not specified
@@ -77,18 +77,12 @@ function RegisterEntriesPage() {
     if (!classId && classes?.[0]) setClassId(classes[0].id);
   }, [classes, classId]);
 
-  const selectedClass = useMemo(
-    () => classes?.find((c) => c.id === classId),
-    [classes, classId]
-  );
+  const selectedClass = useMemo(() => classes?.find((c) => c.id === classId), [classes, classId]);
 
   // ----------------------------------------------------
   // Month calculation & intervals
   // ----------------------------------------------------
-  const monthStart = useMemo(
-    () => startOfMonth(parseISO(selectedMonth + "-01")),
-    [selectedMonth]
-  );
+  const monthStart = useMemo(() => startOfMonth(parseISO(selectedMonth + "-01")), [selectedMonth]);
   const monthEnd = useMemo(() => endOfMonth(monthStart), [monthStart]);
   const monthFromStr = format(monthStart, "yyyy-MM-dd");
   const monthToStr = format(monthEnd, "yyyy-MM-dd");
@@ -451,7 +445,7 @@ function RegisterEntriesPage() {
         toast.success(`Imported ${appliedCount} cell edits from CSV! Review and click Save.`);
         e.target.value = "";
       },
-      (err) => toast.error(err)
+      (err) => toast.error(err),
     );
   };
 
@@ -600,9 +594,7 @@ function RegisterEntriesPage() {
       {view === "day" && (
         <div className="space-y-4">
           <div className="flex items-center justify-between">
-            <h2 className="text-xl display">
-              Register for {prettyDate(selectedDate)}
-            </h2>
+            <h2 className="text-xl display">Register for {prettyDate(selectedDate)}</h2>
             <button
               onClick={() => saveDayMutation.mutate()}
               disabled={saveDayMutation.isPending}
@@ -703,7 +695,8 @@ function RegisterEntriesPage() {
 
                     <div className="flex items-center gap-3 shrink-0">
                       <div className="text-xs text-muted-foreground">
-                        <span className="font-semibold text-foreground">{present}</span> / {totalWorking} days
+                        <span className="font-semibold text-foreground">{present}</span> /{" "}
+                        {totalWorking} days
                       </div>
                       <div className="w-16 h-2 bg-muted rounded-full overflow-hidden">
                         <div
@@ -759,12 +752,7 @@ function RegisterEntriesPage() {
               <label className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl border bg-muted/60 text-xs font-medium hover:bg-muted cursor-pointer transition-colors btn-press">
                 <Upload className="h-3.5 w-3.5 text-primary" />
                 Import CSV
-                <input
-                  type="file"
-                  accept=".csv"
-                  onChange={handleFileUpload}
-                  className="hidden"
-                />
+                <input type="file" accept=".csv" onChange={handleFileUpload} className="hidden" />
               </label>
 
               {/* Save Batch Changes */}
@@ -864,7 +852,10 @@ function RegisterEntriesPage() {
                                 S
                               </span>
                             ) : d.isHoliday ? (
-                              <span className="text-[10px] text-accent font-bold" title={d.holidayReason}>
+                              <span
+                                className="text-[10px] text-accent font-bold"
+                                title={d.holidayReason}
+                              >
                                 H
                               </span>
                             ) : status === "present" ? (
@@ -918,7 +909,8 @@ function RegisterEntriesPage() {
                 </span>
               </div>
               <p className="text-[11px] text-muted-foreground">
-                💡 Tip: Click any cell to cycle status (Present ➔ Absent ➔ Unmarked). Use column "P/A" buttons for bulk day marking.
+                💡 Tip: Click any cell to cycle status (Present ➔ Absent ➔ Unmarked). Use column
+                "P/A" buttons for bulk day marking.
               </p>
             </div>
           </div>

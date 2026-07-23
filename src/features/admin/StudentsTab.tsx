@@ -28,7 +28,8 @@ export function StudentsTab() {
     const trimmedName = name.trim();
     if (!trimmedRoll || !trimmedName) return toast.error("Roll number and name are required");
     if (trimmedRoll.length > 20) return toast.error("Roll number must be 20 characters or less.");
-    if (trimmedName.length > 100) return toast.error("Student name must be 100 characters or less.");
+    if (trimmedName.length > 100)
+      return toast.error("Student name must be 100 characters or less.");
 
     const { error } = await supabase
       .from("students")

@@ -94,7 +94,7 @@ function HolidayPage() {
       .from("class_holidays")
       .upsert(
         { class_id: classId, date, reason: trimmedReason, created_by: uid },
-        { onConflict: "class_id,date" }
+        { onConflict: "class_id,date" },
       );
     setSaving(false);
     if (error) return toast.error(error.message);
@@ -104,7 +104,8 @@ function HolidayPage() {
   };
 
   const unmark = async (id: string, dateStr: string) => {
-    if (!confirm(`Remove holiday on ${prettyDate(dateStr)}? Attendance may need to be re-marked.`)) return;
+    if (!confirm(`Remove holiday on ${prettyDate(dateStr)}? Attendance may need to be re-marked.`))
+      return;
     setRemoving(id);
     const { error } = await supabase.from("class_holidays").delete().eq("id", id);
     setRemoving(null);
@@ -218,7 +219,10 @@ function HolidayPage() {
           </h2>
           <ul className="divide-y rounded-xl border bg-background overflow-hidden">
             {monthHolidays.map((h) => (
-              <li key={h.id} className="flex items-center justify-between px-3 py-2.5 text-sm gap-2">
+              <li
+                key={h.id}
+                className="flex items-center justify-between px-3 py-2.5 text-sm gap-2"
+              >
                 <div className="flex items-center gap-3 min-w-0">
                   <span className="font-mono text-xs text-muted-foreground shrink-0">
                     {prettyDate(h.date)}

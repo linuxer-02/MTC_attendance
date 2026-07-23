@@ -74,7 +74,10 @@ export function StaffTab({ isPrincipal }: { isPrincipal: boolean }) {
   };
 
   const toggleVerified = async (userId: string, current: boolean) => {
-    const { error } = await supabase.from("profiles").update({ verified: !current }).eq("id", userId);
+    const { error } = await supabase
+      .from("profiles")
+      .update({ verified: !current })
+      .eq("id", userId);
     if (error) return toast.error(error.message);
     qc.invalidateQueries({ queryKey: ["all-profiles"] });
     toast.success(`User ${!current ? "verified" : "unverified"}`);

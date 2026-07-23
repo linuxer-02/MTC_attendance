@@ -16,7 +16,10 @@ function loadEnv() {
         if (index > 0) {
           const key = trimmed.slice(0, index).trim();
           let value = trimmed.slice(index + 1).trim();
-          if ((value.startsWith('"') && value.endsWith('"')) || (value.startsWith("'") && value.endsWith("'"))) {
+          if (
+            (value.startsWith('"') && value.endsWith('"')) ||
+            (value.startsWith("'") && value.endsWith("'"))
+          ) {
             value = value.slice(1, -1);
           }
           if (!process.env[key]) {
@@ -26,19 +29,29 @@ function loadEnv() {
       }
     }
   } catch (err) {
-    console.warn("Warning: Failed to load local .env file:", err instanceof Error ? err.message : err);
+    console.warn(
+      "Warning: Failed to load local .env file:",
+      err instanceof Error ? err.message : err,
+    );
   }
 }
 
 loadEnv();
 
-const SUPABASE_URL = process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL || "https://yazlbclgbbjgqtxedktj.supabase.co";
+const SUPABASE_URL =
+  process.env.VITE_SUPABASE_URL ||
+  process.env.SUPABASE_URL ||
+  "https://yazlbclgbbjgqtxedktj.supabase.co";
 const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_KEY;
 
 if (!SUPABASE_SERVICE_KEY) {
   console.error("ERROR: SUPABASE_SERVICE_KEY is required!");
-  console.error("Please add it to your local .env file: SUPABASE_SERVICE_KEY='your-service-role-key'");
-  console.error("Or set it in your environment: export SUPABASE_SERVICE_KEY='your-service-role-key'");
+  console.error(
+    "Please add it to your local .env file: SUPABASE_SERVICE_KEY='your-service-role-key'",
+  );
+  console.error(
+    "Or set it in your environment: export SUPABASE_SERVICE_KEY='your-service-role-key'",
+  );
   process.exit(1);
 }
 

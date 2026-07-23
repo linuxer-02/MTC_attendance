@@ -8,7 +8,8 @@ import { Trash2, Plus, Building2, CalendarDays, BookOpen } from "lucide-react";
 export function StructureTab({ isPrincipal }: { isPrincipal: boolean }) {
   const qc = useQueryClient();
   const { data: roles } = useMyRoles();
-  const hodDeptIds = roles?.filter((r) => r.role === "hod" && r.dept_id).map((r) => r.dept_id!) ?? [];
+  const hodDeptIds =
+    roles?.filter((r) => r.role === "hod" && r.dept_id).map((r) => r.dept_id!) ?? [];
 
   const { data: depts } = useQuery({
     queryKey: ["all-depts"],
@@ -36,9 +37,7 @@ export function StructureTab({ isPrincipal }: { isPrincipal: boolean }) {
     queryKey: ["all-classes", hodDeptIds],
     queryFn: async () => {
       const query = supabase.from("classes").select("*, years(label, dept_id)").order("name");
-      const result = isPrincipal
-        ? query
-        : query.in("year_id", years?.map((y) => y.id) ?? []);
+      const result = isPrincipal ? query : query.in("year_id", years?.map((y) => y.id) ?? []);
       const { data, error } = await result;
       if (error) throw error;
       return data ?? [];

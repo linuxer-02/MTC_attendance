@@ -97,7 +97,8 @@ export function generateExcelCSV({
       return "-";
     });
 
-    const pct = workingDaysCount > 0 ? Math.round((presentCount / workingDaysCount) * 100) + "%" : "0%";
+    const pct =
+      workingDaysCount > 0 ? Math.round((presentCount / workingDaysCount) * 100) + "%" : "0%";
 
     rows.push([
       sanitizeCSVCell(student.roll_no),
@@ -145,7 +146,7 @@ export function downloadCSV(content: string, filename: string) {
 export function parseImportedCSV(
   file: File,
   onComplete: (parsedData: { rollNo: string; dayNum: number; status: "P" | "A" }[]) => void,
-  onError: (errMessage: string) => void
+  onError: (errMessage: string) => void,
 ) {
   Papa.parse(file, {
     skipEmptyLines: true,
@@ -154,7 +155,7 @@ export function parseImportedCSV(
         const data = results.data as string[][];
         // Find header row (starts with Roll No)
         const headerIndex = data.findIndex(
-          (row) => row[0]?.toString().trim().toLowerCase() === "roll no"
+          (row) => row[0]?.toString().trim().toLowerCase() === "roll no",
         );
         if (headerIndex === -1) {
           onError("Invalid CSV format. Header row starting with 'Roll No' was not found.");

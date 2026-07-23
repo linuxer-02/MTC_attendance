@@ -35,7 +35,10 @@ function AuthPage() {
       try {
         const { data, error } = await supabase.rpc("has_any_principal");
         if (error) {
-          console.warn("Could not check principal status (migration might not be applied yet):", error.message);
+          console.warn(
+            "Could not check principal status (migration might not be applied yet):",
+            error.message,
+          );
           setHasPrincipal(true); // fallback to standard mode
           return;
         }
@@ -260,7 +263,8 @@ function AuthPage() {
 
           {mode === "setup" && (
             <p className="text-xs text-muted-foreground mt-4 text-center leading-relaxed font-semibold text-accent animate-fade-in">
-              Welcome to AttendHub! Since no Principal exists in the database, this account will be automatically configured as the system Principal.
+              Welcome to AttendHub! Since no Principal exists in the database, this account will be
+              automatically configured as the system Principal.
             </p>
           )}
         </div>

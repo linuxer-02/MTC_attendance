@@ -100,7 +100,8 @@ function ProfilePage() {
         </p>
 
         <p className="text-sm text-muted-foreground mt-2">
-          Status: <span className={`font-medium ${verified ? "text-emerald-600" : "text-warning"}`}>
+          Status:{" "}
+          <span className={`font-medium ${verified ? "text-emerald-600" : "text-warning"}`}>
             {verified ? "Verified" : "Unverified"}
           </span>
         </p>

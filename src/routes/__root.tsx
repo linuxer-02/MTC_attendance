@@ -115,7 +115,8 @@ function RootComponent() {
 
   useEffect(() => {
     const stored = localStorage.getItem("theme");
-    const isDark = stored === "dark" || (!stored && window.matchMedia("(prefers-color-scheme: dark)").matches);
+    const isDark =
+      stored === "dark" || (!stored && window.matchMedia("(prefers-color-scheme: dark)").matches);
     setDark(isDark);
   }, []);
 
