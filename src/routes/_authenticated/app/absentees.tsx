@@ -300,11 +300,11 @@ function AbsenteesPage() {
                 </div>
                 <ul className="divide-y">
                   {g.students.map((s) => (
-                    <li key={s.roll_no} className="flex items-center gap-3 py-2 text-sm">
-                      <span className="font-mono text-xs text-muted-foreground w-10 shrink-0">
+                    <li key={s.roll_no} className="flex items-center gap-3 py-2 text-sm min-w-0">
+                      <span className="font-mono text-xs text-muted-foreground min-w-[4.5rem] max-w-[7.5rem] truncate shrink-0">
                         {s.roll_no}
                       </span>
-                      <span>{s.name}</span>
+                      <span className="truncate">{s.name}</span>
                     </li>
                   ))}
                 </ul>

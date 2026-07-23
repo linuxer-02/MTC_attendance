@@ -4,9 +4,10 @@ import { z } from "zod";
 import { supabase } from "@/integrations/supabase/client";
 import { useMyAccessibleClasses } from "@/features/shared/roles";
 import { todayISO, prettyDate, isSundayISO } from "@/features/shared/date";
-import { useQueryClient } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { Palmtree, CalendarCheck2 } from "lucide-react";
+import { Palmtree, CalendarCheck2, Trash2, CalendarX2 } from "lucide-react";
+import { format, startOfMonth, endOfMonth, parseISO } from "date-fns";
 
 const searchSchema = z.object({ classId: z.string().optional() });
 export const Route = createFileRoute("/_authenticated/app/holiday")({
@@ -22,6 +23,7 @@ function HolidayPage() {
   const [date, setDate] = useState(todayISO());
   const [reason, setReason] = useState("");
   const [saving, setSaving] = useState(false);
+  const [removing, setRemoving] = useState<string | null>(null);
   const nav = useNavigate();
   const qc = useQueryClient();
 
@@ -29,19 +31,86 @@ function HolidayPage() {
     if (!classId && classes?.[0]) setClassId(classes[0].id);
   }, [classes, classId]);
 
+  // Live check: is the selected date already a holiday?
+  const { data: existingHoliday, refetch: refetchExisting } = useQuery({
+    enabled: !!classId && !!date,
+    queryKey: ["holiday-check", classId, date],
+    queryFn: async () => {
+      const { data } = await supabase
+        .from("class_holidays")
+        .select("id, reason")
+        .eq("class_id", classId!)
+        .eq("date", date)
+        .maybeSingle();
+      return data;
+    },
+  });
+
+  // Load all holidays for the current month (for the list below)
+  const monthStart = format(startOfMonth(parseISO(date.substring(0, 7) + "-01")), "yyyy-MM-dd");
+  const monthEnd = format(endOfMonth(parseISO(date.substring(0, 7) + "-01")), "yyyy-MM-dd");
+
+  const { data: monthHolidays, refetch: refetchMonth } = useQuery({
+    enabled: !!classId,
+    queryKey: ["holidays-month", classId, monthStart, monthEnd],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("class_holidays")
+        .select("id, date, reason")
+        .eq("class_id", classId!)
+        .gte("date", monthStart)
+        .lte("date", monthEnd)
+        .order("date");
+      if (error) throw error;
+      return data ?? [];
+    },
+  });
+
+  const invalidateAll = () => {
+    qc.invalidateQueries({ queryKey: ["holiday-check"] });
+    qc.invalidateQueries({ queryKey: ["holidays-month"] });
+    qc.invalidateQueries({ queryKey: ["holi-week"] });
+    qc.invalidateQueries({ queryKey: ["holi-month"] });
+    qc.invalidateQueries({ queryKey: ["holi-month-register"] });
+    refetchExisting();
+    refetchMonth();
+  };
+
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!classId) return;
     if (isSundayISO(date)) return toast.error("Sunday is already a leave — no need to mark.");
+
+    const trimmedReason = reason.trim();
+    if (!trimmedReason) return toast.error("Please provide a reason for the holiday.");
+    if (trimmedReason.length > 200) return toast.error("Reason must be 200 characters or less.");
+
+    const { data: authData } = await supabase.auth.getUser();
+    const uid = authData.user?.id;
+    if (!uid) return toast.error("Session expired. Please sign in again.");
+
     setSaving(true);
     const { error } = await supabase
       .from("class_holidays")
-      .upsert({ class_id: classId, date, reason }, { onConflict: "class_id,date" });
+      .upsert(
+        { class_id: classId, date, reason: trimmedReason, created_by: uid },
+        { onConflict: "class_id,date" }
+      );
     setSaving(false);
     if (error) return toast.error(error.message);
     toast.success("Holiday saved ✓");
-    qc.invalidateQueries();
-    nav({ to: "/app" });
+    setReason("");
+    invalidateAll();
+  };
+
+  const unmark = async (id: string, dateStr: string) => {
+    if (!confirm(`Remove holiday on ${prettyDate(dateStr)}? Attendance may need to be re-marked.`)) return;
+    setRemoving(id);
+    const { error } = await supabase.from("class_holidays").delete().eq("id", id);
+    setRemoving(null);
+    if (error) return toast.error("Failed to remove holiday: " + error.message);
+    toast.success(`Holiday on ${prettyDate(dateStr)} removed ✓`);
+    invalidateAll();
   };
 
   return (
@@ -87,32 +156,89 @@ function HolidayPage() {
             <CalendarCheck2 className="h-3.5 w-3.5" />
             {prettyDate(date)}
           </div>
+
+          {/* Live status indicator for selected date */}
+          {existingHoliday && (
+            <div className="mt-2 flex items-center justify-between rounded-xl bg-accent/10 border border-accent/20 px-3 py-2">
+              <div className="flex items-center gap-2 text-xs text-accent font-medium">
+                <Palmtree className="h-3.5 w-3.5" />
+                Already a holiday: <span className="font-semibold">"{existingHoliday.reason}"</span>
+              </div>
+              <button
+                type="button"
+                onClick={() => unmark(existingHoliday.id, date)}
+                disabled={removing === existingHoliday.id}
+                className="flex items-center gap-1 text-xs text-destructive font-medium hover:underline ml-2 shrink-0 btn-press"
+              >
+                <CalendarX2 className="h-3.5 w-3.5" />
+                {removing === existingHoliday.id ? "Removing…" : "Unmark"}
+              </button>
+            </div>
+          )}
         </div>
 
-        {/* Reason */}
-        <div>
-          <label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
-            Reason
-          </label>
-          <input
-            value={reason}
-            onChange={(e) => setReason(e.target.value)}
-            required
-            maxLength={200}
-            placeholder="e.g. College holiday, Festival, Exam"
-            className="mt-1.5 w-full rounded-xl border bg-background px-3 py-2.5 text-sm"
-          />
-        </div>
+        {/* Reason — hidden if already marked (since you can edit via unmark + re-add) */}
+        {!existingHoliday && (
+          <div>
+            <label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
+              Reason
+            </label>
+            <input
+              value={reason}
+              onChange={(e) => setReason(e.target.value)}
+              required
+              maxLength={200}
+              placeholder="e.g. College holiday, Festival, Exam"
+              className="mt-1.5 w-full rounded-xl border bg-background px-3 py-2.5 text-sm"
+            />
+          </div>
+        )}
 
-        <button
-          disabled={saving}
-          type="submit"
-          className="w-full flex items-center justify-center gap-2 rounded-xl gradient-primary text-primary-foreground py-3.5 text-sm font-medium shadow-sm btn-press"
-        >
-          <Palmtree className="h-4 w-4" />
-          {saving ? "Saving…" : "Save Holiday"}
-        </button>
+        {!existingHoliday && (
+          <button
+            disabled={saving}
+            type="submit"
+            className="w-full flex items-center justify-center gap-2 rounded-xl gradient-primary text-primary-foreground py-3.5 text-sm font-medium shadow-sm btn-press"
+          >
+            <Palmtree className="h-4 w-4" />
+            {saving ? "Saving…" : "Save Holiday"}
+          </button>
+        )}
       </form>
+
+      {/* Current Month Holidays List */}
+      {monthHolidays && monthHolidays.length > 0 && (
+        <div className="rounded-2xl border bg-card p-4 shadow-sm space-y-3">
+          <h2 className="text-lg display flex items-center gap-2">
+            <CalendarX2 className="h-4 w-4 text-accent" />
+            Holidays This Month
+            <span className="ml-auto text-xs text-muted-foreground font-normal">
+              {monthHolidays.length} marked
+            </span>
+          </h2>
+          <ul className="divide-y rounded-xl border bg-background overflow-hidden">
+            {monthHolidays.map((h) => (
+              <li key={h.id} className="flex items-center justify-between px-3 py-2.5 text-sm gap-2">
+                <div className="flex items-center gap-3 min-w-0">
+                  <span className="font-mono text-xs text-muted-foreground shrink-0">
+                    {prettyDate(h.date)}
+                  </span>
+                  <span className="truncate text-sm font-medium">{h.reason}</span>
+                </div>
+                <button
+                  onClick={() => unmark(h.id, h.date)}
+                  disabled={removing === h.id}
+                  className="flex items-center gap-1 text-xs text-destructive hover:bg-destructive/10 px-2 py-1 rounded-lg transition-colors shrink-0 btn-press"
+                  title="Remove holiday"
+                >
+                  <Trash2 className="h-3.5 w-3.5" />
+                  {removing === h.id ? "…" : "Unmark"}
+                </button>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
 
       <div className="rounded-2xl border bg-accent/8 border-accent/20 p-4 text-sm">
         <p className="text-muted-foreground leading-relaxed">

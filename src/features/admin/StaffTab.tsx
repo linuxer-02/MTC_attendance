@@ -44,6 +44,18 @@ export function StaffTab({ isPrincipal }: { isPrincipal: boolean }) {
 
   const assign = async () => {
     if (!userId) return toast.error("Pick a staff member");
+
+    // Security: only principals can assign HOD roles
+    const currentIsPrincipal = roles?.some((r) => r.role === "principal");
+    if (role === "hod" && !currentIsPrincipal) {
+      return toast.error("Only the Principal can assign HOD roles.");
+    }
+    if (role === "principal") {
+      return toast.error("Principal roles cannot be assigned from this panel.");
+    }
+    if (role === "hod" && !deptId) return toast.error("Select a department for HOD.");
+    if (role === "incharge" && !classId) return toast.error("Select a class for Incharge.");
+
     const payload: any = { user_id: userId, role };
     if (role === "hod") payload.dept_id = deptId || null;
     if (role === "incharge") payload.class_id = classId || null;
@@ -140,7 +152,7 @@ export function StaffTab({ isPrincipal }: { isPrincipal: boolean }) {
                 <option value="">Class…</option>
                 {classes?.map((c: any) => (
                   <option key={c.id} value={c.id}>
-                    {c.years?.departments?.name} · {c.years?.label} · {c.name}
+                    {c.dept_name} · {c.year_label} · {c.name}
                   </option>
                 ))}
               </select>
@@ -200,8 +212,8 @@ export function StaffTab({ isPrincipal }: { isPrincipal: boolean }) {
                         )}
                         {cls && (
                           <>
-                            <BookOpen className="h-3 w-3" /> {cls.years?.departments?.name} ·{" "}
-                            {cls.years?.label} · {cls.name}
+                            <BookOpen className="h-3 w-3" /> {cls.dept_name} · {cls.year_label} ·{" "}
+                            {cls.name}
                           </>
                         )}
                       </span>

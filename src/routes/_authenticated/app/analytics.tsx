@@ -277,12 +277,12 @@ function AnalyticsPage() {
             {atRisk
               .sort((a, b) => a.pct - b.pct)
               .map((s) => (
-                <li key={s.id} className="flex items-center justify-between py-2.5 text-sm">
-                  <div className="flex items-center gap-3">
-                    <span className="font-mono text-xs text-muted-foreground w-10">
+                <li key={s.id} className="flex items-center justify-between py-2.5 text-sm min-w-0">
+                  <div className="flex items-center gap-3 min-w-0">
+                    <span className="font-mono text-xs text-muted-foreground min-w-[4.5rem] max-w-[7.5rem] truncate shrink-0">
                       {s.roll_no}
                     </span>
-                    <span className="font-medium">{s.name}</span>
+                    <span className="font-medium truncate">{s.name}</span>
                   </div>
                   <div className="flex items-center gap-2">
                     <div className="w-16 h-1.5 bg-muted rounded-full overflow-hidden">
@@ -312,12 +312,12 @@ function AnalyticsPage() {
             {excellent
               .sort((a, b) => b.pct - a.pct)
               .map((s) => (
-                <li key={s.id} className="flex items-center justify-between py-2.5 text-sm">
-                  <div className="flex items-center gap-3">
-                    <span className="font-mono text-xs text-muted-foreground w-10">
+                <li key={s.id} className="flex items-center justify-between py-2.5 text-sm min-w-0">
+                  <div className="flex items-center gap-3 min-w-0">
+                    <span className="font-mono text-xs text-muted-foreground min-w-[4.5rem] max-w-[7.5rem] truncate shrink-0">
                       {s.roll_no}
                     </span>
-                    <span className="font-medium">{s.name}</span>
+                    <span className="font-medium truncate">{s.name}</span>
                   </div>
                   <span className="text-success font-bold text-xs">{s.pct}%</span>
                 </li>
@@ -336,7 +336,7 @@ function AnalyticsPage() {
               .map((s) => (
                 <li key={s.id} className="flex items-center justify-between py-2.5">
                   <div className="flex items-center gap-3 min-w-0">
-                    <span className="font-mono text-xs text-muted-foreground w-10 shrink-0">
+                    <span className="font-mono text-xs text-muted-foreground min-w-[4.5rem] max-w-[7.5rem] truncate shrink-0">
                       {s.roll_no}
                     </span>
                     <span className="truncate">{s.name}</span>

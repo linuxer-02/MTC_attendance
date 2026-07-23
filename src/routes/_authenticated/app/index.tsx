@@ -4,7 +4,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useMyAccessibleClasses } from "@/features/shared/roles";
 import { currentWeekDays, isSundayISO, prettyDate, todayISO } from "@/features/shared/date";
 import { useQuery } from "@tanstack/react-query";
-import { CalendarCheck2, ChevronRight, Palmtree, Pencil } from "lucide-react";
+import { CalendarCheck2, ChevronRight, Palmtree, Pencil, BarChart2 } from "lucide-react";
 
 export const Route = createFileRoute("/_authenticated/app/")({
   head: () => ({ meta: [{ title: "This week — Smart Attend Hub" }] }),
@@ -134,6 +134,13 @@ function WeekView() {
             </option>
           ))}
         </select>
+        <Link
+          to="/app/analytics"
+          className="p-2.5 rounded-xl border bg-card text-muted-foreground hover:text-foreground hover:bg-muted/60 transition-all shadow-sm shrink-0 btn-press"
+          title="View Analytics"
+        >
+          <BarChart2 className="h-4 w-4" />
+        </Link>
         <Link
           to="/app/mark"
           search={{ classId: classId ?? "" }}

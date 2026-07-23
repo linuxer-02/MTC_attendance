@@ -17,6 +17,7 @@ import {
   Moon,
   BarChart2,
   User,
+  FileSpreadsheet,
 } from "lucide-react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState, useEffect } from "react";
@@ -74,7 +75,7 @@ function AuthedShell() {
     { to: "/app", label: "Home", icon: Home, exact: true },
     { to: "/app/mark", label: "Mark", icon: ClipboardCheck },
     { to: "/app/absentees", label: "Report", icon: ListChecks },
-    { to: "/app/analytics", label: "Analytics", icon: BarChart2 },
+    { to: "/app/entries", label: "Register", icon: FileSpreadsheet },
     ...(isAdmin ? [{ to: "/app/admin", label: "Admin", icon: Settings }] : []),
   ];
 
@@ -94,9 +95,18 @@ function AuthedShell() {
 
           <div className="flex items-center gap-1">
             <Link
+              to="/app/analytics"
+              className="p-2 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted/60 transition-all"
+              aria-label="Analytics"
+              title="Analytics"
+            >
+              <BarChart2 className="h-4 w-4" />
+            </Link>
+            <Link
               to="/app/profile"
               className="p-2 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted/60 transition-all"
               aria-label="Profile"
+              title="Profile"
             >
               <User className="h-4 w-4" />
             </Link>
@@ -104,6 +114,7 @@ function AuthedShell() {
               onClick={toggleDark}
               className="p-2 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted/60 transition-all"
               aria-label="Toggle dark mode"
+              title="Toggle dark mode"
             >
               {dark ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
             </button>
@@ -111,6 +122,7 @@ function AuthedShell() {
               onClick={signOut}
               className="p-2 rounded-lg text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-all"
               aria-label="Sign out"
+              title="Sign out"
             >
               <LogOut className="h-4 w-4" />
             </button>

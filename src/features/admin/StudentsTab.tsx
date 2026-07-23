@@ -24,19 +24,23 @@ export function StudentsTab() {
 
   const addOne = async () => {
     if (!classId) return toast.error("Select a class first");
-    if (!rollNo.trim() || !name.trim()) return toast.error("Roll number and name are required");
-    
+    const trimmedRoll = rollNo.trim();
+    const trimmedName = name.trim();
+    if (!trimmedRoll || !trimmedName) return toast.error("Roll number and name are required");
+    if (trimmedRoll.length > 20) return toast.error("Roll number must be 20 characters or less.");
+    if (trimmedName.length > 100) return toast.error("Student name must be 100 characters or less.");
+
     const { error } = await supabase
       .from("students")
-      .insert({ class_id: classId, roll_no: rollNo.trim(), name: name.trim() });
-      
+      .insert({ class_id: classId, roll_no: trimmedRoll, name: trimmedName });
+
     if (error) {
       if (error.code === "23505") {
         return toast.error("A student with this roll number already exists in this class");
       }
       return toast.error(error.message);
     }
-    
+
     setRollNo("");
     setName("");
     refetch();
@@ -175,9 +179,11 @@ export function StudentsTab() {
                   key={s.id}
                   className="flex items-center justify-between px-4 py-3 text-sm hover:bg-muted/30 transition-colors"
                 >
-                  <div className="flex items-center gap-3">
-                    <span className="font-mono text-xs text-muted-foreground w-8">{s.roll_no}</span>
-                    <span className="font-medium">{s.name}</span>
+                  <div className="flex items-center gap-3 min-w-0">
+                    <span className="font-mono text-xs text-muted-foreground min-w-[4.5rem] max-w-[7.5rem] truncate shrink-0">
+                      {s.roll_no}
+                    </span>
+                    <span className="font-medium truncate">{s.name}</span>
                   </div>
                   <button
                     onClick={() => del(s.id)}

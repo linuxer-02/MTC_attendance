@@ -16,6 +16,7 @@ import { Route as AuthenticatedAppIndexRouteImport } from './routes/_authenticat
 import { Route as AuthenticatedAppAbsenteesRouteImport } from './routes/_authenticated/app/absentees'
 import { Route as AuthenticatedAppAdminRouteImport } from './routes/_authenticated/app/admin'
 import { Route as AuthenticatedAppAnalyticsRouteImport } from './routes/_authenticated/app/analytics'
+import { Route as AuthenticatedAppEntriesRouteImport } from './routes/_authenticated/app/entries'
 import { Route as AuthenticatedAppHolidayRouteImport } from './routes/_authenticated/app/holiday'
 import { Route as AuthenticatedAppMarkRouteImport } from './routes/_authenticated/app/mark'
 import { Route as AuthenticatedAppProfileRouteImport } from './routes/_authenticated/app/profile'
@@ -56,6 +57,11 @@ const AuthenticatedAppAnalyticsRoute =
     path: '/app/analytics',
     getParentRoute: () => AuthenticatedRouteRoute,
   } as any)
+const AuthenticatedAppEntriesRoute = AuthenticatedAppEntriesRouteImport.update({
+  id: '/app/entries',
+  path: '/app/entries',
+  getParentRoute: () => AuthenticatedRouteRoute,
+} as any)
 const AuthenticatedAppHolidayRoute = AuthenticatedAppHolidayRouteImport.update({
   id: '/app/holiday',
   path: '/app/holiday',
@@ -78,6 +84,7 @@ export interface FileRoutesByFullPath {
   '/app/absentees': typeof AuthenticatedAppAbsenteesRoute
   '/app/admin': typeof AuthenticatedAppAdminRoute
   '/app/analytics': typeof AuthenticatedAppAnalyticsRoute
+  '/app/entries': typeof AuthenticatedAppEntriesRoute
   '/app/holiday': typeof AuthenticatedAppHolidayRoute
   '/app/mark': typeof AuthenticatedAppMarkRoute
   '/app/profile': typeof AuthenticatedAppProfileRoute
@@ -89,6 +96,7 @@ export interface FileRoutesByTo {
   '/app/absentees': typeof AuthenticatedAppAbsenteesRoute
   '/app/admin': typeof AuthenticatedAppAdminRoute
   '/app/analytics': typeof AuthenticatedAppAnalyticsRoute
+  '/app/entries': typeof AuthenticatedAppEntriesRoute
   '/app/holiday': typeof AuthenticatedAppHolidayRoute
   '/app/mark': typeof AuthenticatedAppMarkRoute
   '/app/profile': typeof AuthenticatedAppProfileRoute
@@ -102,6 +110,7 @@ export interface FileRoutesById {
   '/_authenticated/app/absentees': typeof AuthenticatedAppAbsenteesRoute
   '/_authenticated/app/admin': typeof AuthenticatedAppAdminRoute
   '/_authenticated/app/analytics': typeof AuthenticatedAppAnalyticsRoute
+  '/_authenticated/app/entries': typeof AuthenticatedAppEntriesRoute
   '/_authenticated/app/holiday': typeof AuthenticatedAppHolidayRoute
   '/_authenticated/app/mark': typeof AuthenticatedAppMarkRoute
   '/_authenticated/app/profile': typeof AuthenticatedAppProfileRoute
@@ -115,6 +124,7 @@ export interface FileRouteTypes {
     | '/app/absentees'
     | '/app/admin'
     | '/app/analytics'
+    | '/app/entries'
     | '/app/holiday'
     | '/app/mark'
     | '/app/profile'
@@ -126,6 +136,7 @@ export interface FileRouteTypes {
     | '/app/absentees'
     | '/app/admin'
     | '/app/analytics'
+    | '/app/entries'
     | '/app/holiday'
     | '/app/mark'
     | '/app/profile'
@@ -138,6 +149,7 @@ export interface FileRouteTypes {
     | '/_authenticated/app/absentees'
     | '/_authenticated/app/admin'
     | '/_authenticated/app/analytics'
+    | '/_authenticated/app/entries'
     | '/_authenticated/app/holiday'
     | '/_authenticated/app/mark'
     | '/_authenticated/app/profile'
@@ -201,6 +213,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedAppAnalyticsRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/_authenticated/app/entries': {
+      id: '/_authenticated/app/entries'
+      path: '/app/entries'
+      fullPath: '/app/entries'
+      preLoaderRoute: typeof AuthenticatedAppEntriesRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
     '/_authenticated/app/holiday': {
       id: '/_authenticated/app/holiday'
       path: '/app/holiday'
@@ -229,6 +248,7 @@ interface AuthenticatedRouteRouteChildren {
   AuthenticatedAppAbsenteesRoute: typeof AuthenticatedAppAbsenteesRoute
   AuthenticatedAppAdminRoute: typeof AuthenticatedAppAdminRoute
   AuthenticatedAppAnalyticsRoute: typeof AuthenticatedAppAnalyticsRoute
+  AuthenticatedAppEntriesRoute: typeof AuthenticatedAppEntriesRoute
   AuthenticatedAppHolidayRoute: typeof AuthenticatedAppHolidayRoute
   AuthenticatedAppMarkRoute: typeof AuthenticatedAppMarkRoute
   AuthenticatedAppProfileRoute: typeof AuthenticatedAppProfileRoute
@@ -239,6 +259,7 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedAppAbsenteesRoute: AuthenticatedAppAbsenteesRoute,
   AuthenticatedAppAdminRoute: AuthenticatedAppAdminRoute,
   AuthenticatedAppAnalyticsRoute: AuthenticatedAppAnalyticsRoute,
+  AuthenticatedAppEntriesRoute: AuthenticatedAppEntriesRoute,
   AuthenticatedAppHolidayRoute: AuthenticatedAppHolidayRoute,
   AuthenticatedAppMarkRoute: AuthenticatedAppMarkRoute,
   AuthenticatedAppProfileRoute: AuthenticatedAppProfileRoute,

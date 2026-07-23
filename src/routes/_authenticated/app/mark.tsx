@@ -85,10 +85,16 @@ function MarkPage() {
   const setStatus = async (studentId: string, next: "present" | "absent") => {
     if (!classId) return;
     setState((s) => ({ ...s, [studentId]: next }));
+    const { data: authData } = await supabase.auth.getUser();
+    const uid = authData.user?.id;
+    if (!uid) {
+      toast.error("Session expired. Please sign in again.");
+      return;
+    }
     const { error } = await supabase
       .from("attendance")
       .upsert(
-        { class_id: classId, student_id: studentId, date: today, status: next },
+        { class_id: classId, student_id: studentId, date: today, status: next, marked_by: uid },
         { onConflict: "student_id,date" },
       );
     if (error) {
@@ -99,11 +105,18 @@ function MarkPage() {
 
   const markAllPresent = async () => {
     if (!classId || !students) return;
+    const { data: authData } = await supabase.auth.getUser();
+    const uid = authData.user?.id;
+    if (!uid) {
+      toast.error("Session expired. Please sign in again.");
+      return;
+    }
     const rows = students.map((s) => ({
       class_id: classId,
       student_id: s.id,
       date: today,
       status: "present" as const,
+      marked_by: uid,
     }));
     const { error } = await supabase
       .from("attendance")
@@ -234,7 +247,7 @@ function MarkPage() {
                       <CheckCircle2 className="h-4 w-4 text-success" />
                     )}
                   </div>
-                  <span className="text-xs font-mono text-muted-foreground w-10 shrink-0">
+                  <span className="text-xs font-mono text-muted-foreground min-w-[4.5rem] max-w-[7.5rem] truncate shrink-0">
                     {s.roll_no}
                   </span>
                   <span className="truncate font-medium">{s.name}</span>
