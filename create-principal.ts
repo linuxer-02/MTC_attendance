@@ -1,12 +1,44 @@
 /// <reference types="node" />
 import { createClient } from "@supabase/supabase-js";
+import * as fs from "fs";
+import * as path from "path";
 
-const SUPABASE_URL = process.env.VITE_SUPABASE_URL || "https://yazlbclgbbjgqtxedktj.supabase.co";
+// Load environment variables from .env manually
+function loadEnv() {
+  try {
+    const envPath = path.resolve(process.cwd(), ".env");
+    if (fs.existsSync(envPath)) {
+      const content = fs.readFileSync(envPath, "utf8");
+      for (const line of content.split(/\r?\n/)) {
+        const trimmed = line.trim();
+        if (!trimmed || trimmed.startsWith("#")) continue;
+        const index = trimmed.indexOf("=");
+        if (index > 0) {
+          const key = trimmed.slice(0, index).trim();
+          let value = trimmed.slice(index + 1).trim();
+          if ((value.startsWith('"') && value.endsWith('"')) || (value.startsWith("'") && value.endsWith("'"))) {
+            value = value.slice(1, -1);
+          }
+          if (!process.env[key]) {
+            process.env[key] = value;
+          }
+        }
+      }
+    }
+  } catch (err) {
+    console.warn("Warning: Failed to load local .env file:", err instanceof Error ? err.message : err);
+  }
+}
+
+loadEnv();
+
+const SUPABASE_URL = process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL || "https://yazlbclgbbjgqtxedktj.supabase.co";
 const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_KEY;
 
 if (!SUPABASE_SERVICE_KEY) {
-  console.error("ERROR: SUPABASE_SERVICE_KEY environment variable is required!");
-  console.error("Set it with: export SUPABASE_SERVICE_KEY='your-service-role-key'");
+  console.error("ERROR: SUPABASE_SERVICE_KEY is required!");
+  console.error("Please add it to your local .env file: SUPABASE_SERVICE_KEY='your-service-role-key'");
+  console.error("Or set it in your environment: export SUPABASE_SERVICE_KEY='your-service-role-key'");
   process.exit(1);
 }
 

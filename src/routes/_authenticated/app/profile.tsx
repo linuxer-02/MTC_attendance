@@ -31,6 +31,7 @@ function ProfilePage() {
 
   const [fullName, setFullName] = useState("");
   const [email, setEmail] = useState("");
+  const [verified, setVerified] = useState(false);
   const [saving, setSaving] = useState(false);
   const [userId, setUserId] = useState<string | null>(null);
 
@@ -46,12 +47,13 @@ function ProfilePage() {
     if (!userId) return;
     supabase
       .from("profiles")
-      .select("full_name, email")
+      .select("full_name, email, verified")
       .eq("id", userId)
       .maybeSingle()
       .then(({ data }) => {
         if (data?.full_name) setFullName(data.full_name);
         if (data?.email) setEmail(data.email);
+        if (typeof data?.verified === "boolean") setVerified(data.verified);
       });
   }, [userId]);
 
@@ -95,6 +97,12 @@ function ProfilePage() {
         <p className="text-sm text-muted-foreground mt-1 flex items-center justify-center gap-1.5">
           <Mail className="h-3.5 w-3.5" />
           {email}
+        </p>
+
+        <p className="text-sm text-muted-foreground mt-2">
+          Status: <span className={`font-medium ${verified ? "text-emerald-600" : "text-warning"}`}>
+            {verified ? "Verified" : "Unverified"}
+          </span>
         </p>
 
         {/* Role badges */}

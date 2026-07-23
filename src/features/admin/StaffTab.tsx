@@ -1,5 +1,6 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { useMyRoles, useMyAccessibleClasses } from "@/features/shared/roles";
 import { useState } from "react";
 import { toast } from "sonner";
 import { Trash2, Shield, Plus, Building2, BookOpen } from "lucide-react";
@@ -8,13 +9,15 @@ type AppRole = "principal" | "hod" | "incharge";
 
 export function StaffTab({ isPrincipal }: { isPrincipal: boolean }) {
   const qc = useQueryClient();
+  const { data: roles } = useMyRoles();
+  const canVerify = roles?.some((r) => r.role === "principal" || r.role === "hod");
 
   const { data: profiles } = useQuery({
     queryKey: ["all-profiles"],
     queryFn: async () => {
       const { data, error } = await supabase
         .from("profiles")
-        .select("id, email, full_name")
+        .select("id, email, full_name, verified")
         .order("email");
       if (error) throw error;
       return data ?? [];
@@ -32,16 +35,7 @@ export function StaffTab({ isPrincipal }: { isPrincipal: boolean }) {
     queryKey: ["all-depts"],
     queryFn: async () => (await supabase.from("departments").select("*").order("name")).data ?? [],
   });
-  const { data: classes } = useQuery({
-    queryKey: ["all-classes"],
-    queryFn: async () =>
-      (
-        await supabase
-          .from("classes")
-          .select("id, name, year_id, years(label, departments(name))")
-          .order("name")
-      ).data ?? [],
-  });
+  const { data: classes } = useMyAccessibleClasses();
 
   const [userId, setUserId] = useState("");
   const [role, setRole] = useState<AppRole>("incharge");
@@ -67,8 +61,16 @@ export function StaffTab({ isPrincipal }: { isPrincipal: boolean }) {
     toast.success("Role removed");
   };
 
+  const toggleVerified = async (userId: string, current: boolean) => {
+    const { error } = await supabase.from("profiles").update({ verified: !current }).eq("id", userId);
+    if (error) return toast.error(error.message);
+    qc.invalidateQueries({ queryKey: ["all-profiles"] });
+    toast.success(`User ${!current ? "verified" : "unverified"}`);
+  };
+
   const emailOf = (uid: string) => profiles?.find((p) => p.id === uid)?.email ?? uid.slice(0, 8);
   const nameOf = (uid: string) => profiles?.find((p) => p.id === uid)?.full_name;
+  const isVerified = (uid: string) => profiles?.find((p) => p.id === uid)?.verified ?? false;
 
   return (
     <div className="space-y-4">
@@ -205,14 +207,25 @@ export function StaffTab({ isPrincipal }: { isPrincipal: boolean }) {
                       </span>
                     </div>
                   </div>
-                  {(isPrincipal || r.role === "incharge") && (
-                    <button
-                      onClick={() => removeRole(r.id)}
-                      className="p-1.5 rounded-lg text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors shrink-0"
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </button>
-                  )}
+                  <div className="flex items-center gap-2">
+                    {canVerify && (
+                      <button
+                        onClick={() => toggleVerified(r.user_id, isVerified(r.user_id))}
+                        className="p-1.5 rounded-lg text-foreground bg-background hover:bg-muted transition-colors shrink-0"
+                        aria-label={isVerified(r.user_id) ? "Unverify user" : "Verify user"}
+                      >
+                        {isVerified(r.user_id) ? "Unverify" : "Verify"}
+                      </button>
+                    )}
+                    {(isPrincipal || r.role === "incharge") && (
+                      <button
+                        onClick={() => removeRole(r.id)}
+                        className="p-1.5 rounded-lg text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors shrink-0"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </button>
+                    )}
+                  </div>
                 </li>
               );
             })}

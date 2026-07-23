@@ -1,35 +1,49 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { useMyRoles } from "@/features/shared/roles";
 import { useState } from "react";
 import { toast } from "sonner";
 import { Trash2, Plus, Building2, CalendarDays, BookOpen } from "lucide-react";
 
 export function StructureTab({ isPrincipal }: { isPrincipal: boolean }) {
   const qc = useQueryClient();
+  const { data: roles } = useMyRoles();
+  const hodDeptIds = roles?.filter((r) => r.role === "hod" && r.dept_id).map((r) => r.dept_id!) ?? [];
 
   const { data: depts } = useQuery({
     queryKey: ["all-depts"],
     queryFn: async () => {
-      const { data, error } = await supabase.from("departments").select("*").order("name");
+      const query = supabase.from("departments").select("*").order("name");
+      const result = isPrincipal ? query : query.in("id", hodDeptIds);
+      const { data, error } = await result;
       if (error) throw error;
       return data ?? [];
     },
+    enabled: isPrincipal || hodDeptIds.length > 0,
   });
   const { data: years } = useQuery({
-    queryKey: ["all-years"],
+    queryKey: ["all-years", hodDeptIds],
     queryFn: async () => {
-      const { data, error } = await supabase.from("years").select("*").order("label");
+      const query = supabase.from("years").select("*").order("label");
+      const result = isPrincipal ? query : query.in("dept_id", hodDeptIds);
+      const { data, error } = await result;
       if (error) throw error;
       return data ?? [];
     },
+    enabled: isPrincipal || hodDeptIds.length > 0,
   });
   const { data: classes } = useQuery({
-    queryKey: ["all-classes"],
+    queryKey: ["all-classes", hodDeptIds],
     queryFn: async () => {
-      const { data, error } = await supabase.from("classes").select("*").order("name");
+      const query = supabase.from("classes").select("*, years(label, dept_id)").order("name");
+      const result = isPrincipal
+        ? query
+        : query.in("year_id", years?.map((y) => y.id) ?? []);
+      const { data, error } = await result;
       if (error) throw error;
       return data ?? [];
     },
+    enabled: (isPrincipal || hodDeptIds.length > 0) && (isPrincipal || !!years?.length),
   });
 
   const [newDept, setNewDept] = useState("");

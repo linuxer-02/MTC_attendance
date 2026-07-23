@@ -3,20 +3,12 @@ import { supabase } from "@/integrations/supabase/client";
 import { useState } from "react";
 import { toast } from "sonner";
 import Papa from "papaparse";
+import { useMyAccessibleClasses } from "@/features/shared/roles";
 import { Trash2, UserPlus, FileUp, Users, Plus } from "lucide-react";
 
 export function StudentsTab() {
   const qc = useQueryClient();
-  const { data: classes } = useQuery({
-    queryKey: ["all-classes-simple"],
-    queryFn: async () =>
-      (
-        await supabase
-          .from("classes")
-          .select("id, name, year_id, years(label, departments(name))")
-          .order("name")
-      ).data ?? [],
-  });
+  const { data: classes } = useMyAccessibleClasses();
   const [classId, setClassId] = useState("");
   const { data: students, refetch } = useQuery({
     enabled: !!classId,
@@ -93,9 +85,9 @@ export function StudentsTab() {
         className="w-full rounded-xl border bg-card px-3 py-2.5 text-sm shadow-sm"
       >
         <option value="">Select a class…</option>
-        {classes?.map((c: any) => (
+        {classes?.map((c) => (
           <option key={c.id} value={c.id}>
-            {c.years?.departments?.name} · {c.years?.label} · {c.name}
+            {c.dept_name} · {c.year_label} · {c.name}
           </option>
         ))}
       </select>

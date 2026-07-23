@@ -16,12 +16,13 @@ export const Route = createFileRoute("/auth")({
 function AuthPage() {
   const navigate = useNavigate();
   const router = useRouter();
-  const [mode, setMode] = useState<"signin" | "signup">("signin");
+  const [mode, setMode] = useState<"signin" | "signup" | "setup">("signin");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [fullName, setFullName] = useState("");
   const [loading, setLoading] = useState(false);
   const [showPass, setShowPass] = useState(false);
+  const [hasPrincipal, setHasPrincipal] = useState<boolean | null>(null);
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data }) => {
@@ -29,11 +30,59 @@ function AuthPage() {
     });
   }, [navigate]);
 
+  useEffect(() => {
+    async function checkPrincipal() {
+      try {
+        const { data, error } = await supabase.rpc("has_any_principal");
+        if (error) {
+          console.warn("Could not check principal status (migration might not be applied yet):", error.message);
+          setHasPrincipal(true); // fallback to standard mode
+          return;
+        }
+        setHasPrincipal(!!data);
+        if (data === false) {
+          setMode("setup");
+        }
+      } catch (err: any) {
+        console.warn("Error checking principal status:", err?.message ?? err);
+        setHasPrincipal(true); // fallback
+      }
+    }
+    checkPrincipal();
+  }, []);
+
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
     try {
-      if (mode === "signup") {
+      if (mode === "setup") {
+        const { error: signUpError } = await supabase.auth.signUp({
+          email,
+          password,
+          options: {
+            emailRedirectTo: `${window.location.origin}/`,
+            data: { full_name: fullName },
+          },
+        });
+        if (signUpError) throw signUpError;
+
+        const { error: rpcError } = await supabase.rpc("create_first_principal", {
+          target_email: email,
+        });
+        if (rpcError) throw rpcError;
+
+        toast.success("Principal account created successfully!");
+
+        const { error: loginError } = await supabase.auth.signInWithPassword({ email, password });
+        if (loginError) {
+          toast.info("Setup complete! Please sign in with your new credentials.");
+          setMode("signin");
+          setHasPrincipal(true);
+        } else {
+          await router.invalidate();
+          navigate({ to: "/app", replace: true });
+        }
+      } else if (mode === "signup") {
         const { error } = await supabase.auth.signUp({
           email,
           password,
@@ -48,8 +97,10 @@ function AuthPage() {
         const { error } = await supabase.auth.signInWithPassword({ email, password });
         if (error) throw error;
       }
-      await router.invalidate();
-      navigate({ to: "/app", replace: true });
+      if (mode !== "setup") {
+        await router.invalidate();
+        navigate({ to: "/app", replace: true });
+      }
     } catch (err: any) {
       toast.error(err.message ?? "Something went wrong");
     } finally {
@@ -81,7 +132,7 @@ function AuthPage() {
             Attend<span className="text-accent">Hub</span>
           </h1>
           <p className="text-sm text-muted-foreground mt-1 display text-lg">
-            smart attendance register
+            {mode === "setup" ? "onboarding setup wizard" : "smart attendance register"}
           </p>
         </div>
 
@@ -91,25 +142,27 @@ function AuthPage() {
           style={{ animationDelay: "80ms" }}
         >
           {/* Mode toggle */}
-          <div className="flex gap-1 mb-6 p-1 bg-muted rounded-xl">
-            {(["signin", "signup"] as const).map((m) => (
-              <button
-                key={m}
-                type="button"
-                onClick={() => setMode(m)}
-                className={`flex-1 py-2 rounded-lg text-sm font-medium transition-all duration-200 ${
-                  mode === m
-                    ? "bg-card shadow-sm text-foreground"
-                    : "text-muted-foreground hover:text-foreground"
-                }`}
-              >
-                {m === "signin" ? "Sign in" : "Sign up"}
-              </button>
-            ))}
-          </div>
+          {hasPrincipal !== false && (
+            <div className="flex gap-1 mb-6 p-1 bg-muted rounded-xl">
+              {(["signin", "signup"] as const).map((m) => (
+                <button
+                  key={m}
+                  type="button"
+                  onClick={() => setMode(m)}
+                  className={`flex-1 py-2 rounded-lg text-sm font-medium transition-all duration-200 ${
+                    mode === m
+                      ? "bg-card shadow-sm text-foreground"
+                      : "text-muted-foreground hover:text-foreground"
+                  }`}
+                >
+                  {m === "signin" ? "Sign in" : "Sign up"}
+                </button>
+              ))}
+            </div>
+          )}
 
           <form onSubmit={submit} className="space-y-4">
-            {mode === "signup" && (
+            {(mode === "signup" || mode === "setup") && (
               <div className="animate-slide-up">
                 <Label
                   htmlFor="fullName"
@@ -190,8 +243,10 @@ function AuthPage() {
                 </span>
               ) : mode === "signin" ? (
                 "Sign in →"
-              ) : (
+              ) : mode === "signup" ? (
                 "Create account →"
+              ) : (
+                "Setup Principal Account →"
               )}
             </Button>
           </form>
@@ -200,6 +255,12 @@ function AuthPage() {
             <p className="text-xs text-muted-foreground mt-4 text-center leading-relaxed">
               New accounts need a role assignment from your Principal or HOD before you can start
               marking attendance.
+            </p>
+          )}
+
+          {mode === "setup" && (
+            <p className="text-xs text-muted-foreground mt-4 text-center leading-relaxed font-semibold text-accent animate-fade-in">
+              Welcome to AttendHub! Since no Principal exists in the database, this account will be automatically configured as the system Principal.
             </p>
           )}
         </div>

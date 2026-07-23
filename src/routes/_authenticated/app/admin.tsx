@@ -20,11 +20,23 @@ const TABS: { key: Tab; label: string; icon: React.ElementType }[] = [
 ];
 
 function AdminPage() {
-  const { data: roles } = useMyRoles();
+  const { data: roles, isLoading } = useMyRoles();
   const isPrincipal = roles?.some((r) => r.role === "principal");
   const isHod = roles?.some((r) => r.role === "hod");
   const canAccess = isPrincipal || isHod;
   const [tab, setTab] = useState<Tab>("structure");
+
+  if (isLoading) {
+    return (
+      <div className="rounded-2xl border bg-card p-8 mt-6 text-center animate-slide-up shadow-sm">
+        <div className="text-4xl mb-4">⏳</div>
+        <h2 className="text-3xl display">Checking access...</h2>
+        <p className="text-sm text-muted-foreground mt-2 max-w-xs mx-auto">
+          Verifying your admin role before loading the panel.
+        </p>
+      </div>
+    );
+  }
 
   if (!canAccess) {
     return (

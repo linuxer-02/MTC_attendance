@@ -144,18 +144,21 @@ export type Database = {
           email: string | null;
           full_name: string | null;
           id: string;
+          verified: boolean;
         };
         Insert: {
           created_at?: string;
           email?: string | null;
           full_name?: string | null;
           id: string;
+          verified?: boolean;
         };
         Update: {
           created_at?: string;
           email?: string | null;
           full_name?: string | null;
           id?: string;
+          verified?: boolean;
         };
         Relationships: [];
       };
@@ -268,6 +271,8 @@ export type Database = {
     };
     Functions: {
       class_dept_id: { Args: { _class_id: string }; Returns: string };
+      create_first_principal: { Args: { target_email: string }; Returns: boolean };
+      has_any_principal: { Args: Record<PropertyKey, never>; Returns: boolean };
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"];
