@@ -350,21 +350,19 @@ function RegisterEntriesPage() {
   // Save Day View Changes
   const saveDayMutation = useMutation({
     mutationFn: async () => {
-      if (!classId || !students) return;
+      if (!classId || !students || students.length === 0) return;
 
       const { data: authData } = await supabase.auth.getUser();
       const uid = authData.user?.id;
       if (!uid) throw new Error("Session expired. Please sign in again.");
 
-      const payload = Array.from(dayEdits.entries()).map(([student_id, status]) => ({
-        student_id,
+      const payload = students.map((s) => ({
+        student_id: s.id,
         class_id: classId,
         date: selectedDate,
-        status,
+        status: dayEdits.get(s.id) ?? "present",
         marked_by: uid,
       }));
-
-      if (payload.length === 0) return;
 
       const { error } = await supabase.from("attendance").upsert(payload, {
         onConflict: "student_id,date",
@@ -375,6 +373,7 @@ function RegisterEntriesPage() {
       toast.success(`Attendance for ${prettyDate(selectedDate)} saved!`);
       queryClient.invalidateQueries({ queryKey: ["att-day-register"] });
       queryClient.invalidateQueries({ queryKey: ["att-week"] });
+      queryClient.invalidateQueries({ queryKey: ["att-month-register"] });
     },
     onError: (err: any) => {
       toast.error("Failed to save day attendance: " + err.message);

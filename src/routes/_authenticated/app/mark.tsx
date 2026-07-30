@@ -1,4 +1,4 @@
-import { createFileRoute, Link } from "@tanstack/react-router";
+import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useMemo, useState, useEffect } from "react";
 import { z } from "zod";
 import { supabase } from "@/integrations/supabase/client";
@@ -18,8 +18,11 @@ export const Route = createFileRoute("/_authenticated/app/mark")({
 
 function MarkPage() {
   const { classId: initial } = Route.useSearch();
+  const navigate = useNavigate();
   const { data: classes } = useMyAccessibleClasses();
   const [classId, setClassId] = useState<string | null>(initial || null);
+  const [isSaving, setIsSaving] = useState(false);
+
   useEffect(() => {
     if (!classId && classes?.[0]) setClassId(classes[0].id);
   }, [classes, classId]);
@@ -82,56 +85,76 @@ function MarkPage() {
     setState(initialMap);
   }, [initialMap]);
 
-  const setStatus = async (studentId: string, next: "present" | "absent") => {
-    if (!classId) return;
-    setState((s) => ({ ...s, [studentId]: next }));
+  const saveAllAttendance = async (currentState: Record<string, "present" | "absent">) => {
+    if (!classId || !students || students.length === 0) return true;
     const { data: authData } = await supabase.auth.getUser();
     const uid = authData.user?.id;
     if (!uid) {
       toast.error("Session expired. Please sign in again.");
-      return;
-    }
-    const { error } = await supabase
-      .from("attendance")
-      .upsert(
-        { class_id: classId, student_id: studentId, date: today, status: next, marked_by: uid },
-        { onConflict: "student_id,date" },
-      );
-    if (error) {
-      toast.error(error.message);
-      setState((s) => ({ ...s, [studentId]: initialMap[studentId] ?? "present" }));
-    }
-  };
-
-  const markAllPresent = async () => {
-    if (!classId || !students) return;
-    const { data: authData } = await supabase.auth.getUser();
-    const uid = authData.user?.id;
-    if (!uid) {
-      toast.error("Session expired. Please sign in again.");
-      return;
+      return false;
     }
     const rows = students.map((s) => ({
       class_id: classId,
       student_id: s.id,
       date: today,
-      status: "present" as const,
+      status: (currentState[s.id] ?? "present") as "present" | "absent",
       marked_by: uid,
     }));
     const { error } = await supabase
       .from("attendance")
       .upsert(rows, { onConflict: "student_id,date" });
-    if (error) return toast.error(error.message);
-    toast.success("All marked present ✓");
+    if (error) {
+      toast.error(error.message);
+      return false;
+    }
     refetch();
     queryClient.invalidateQueries({ queryKey: ["att-week"] });
+    queryClient.invalidateQueries({ queryKey: ["att-month-register"] });
+    queryClient.invalidateQueries({ queryKey: ["att-today"] });
+    return true;
   };
 
-  const absent = (students ?? []).filter((s) => state[s.id] === "absent");
+  const setStatus = async (studentId: string, next: "present" | "absent") => {
+    if (!classId || !students) return;
+    const nextState = { ...state, [studentId]: next };
+    setState(nextState);
+    const ok = await saveAllAttendance(nextState);
+    if (!ok) {
+      setState(state);
+    }
+  };
+
+  const markAllPresent = async () => {
+    if (!classId || !students) return;
+    const nextState: Record<string, "present" | "absent"> = {};
+    students.forEach((s) => {
+      nextState[s.id] = "present";
+    });
+    setState(nextState);
+    const ok = await saveAllAttendance(nextState);
+    if (ok) {
+      toast.success("All marked present ✓");
+    }
+  };
+
+  const handleFinish = async () => {
+    if (!classId) return;
+    setIsSaving(true);
+    const ok = await saveAllAttendance(state);
+    setIsSaving(false);
+    if (ok) {
+      navigate({
+        to: "/app/absentees",
+        search: { classId, date: today },
+      });
+    }
+  };
+
+  const absent = (students ?? []).filter((s) => (state[s.id] ?? "present") === "absent");
   const presentCount = (students ?? []).length - absent.length;
   const total = students?.length ?? 0;
   const pct = total > 0 ? Math.round((presentCount / total) * 100) : 0;
-  const markedCount = Object.keys(state).length;
+  const markedCount = total;
 
   if (isSundayISO(today)) {
     return (
@@ -272,14 +295,15 @@ function MarkPage() {
       </ul>
 
       {/* Finish button */}
-      <Link
-        to="/app/absentees"
-        search={{ classId: classId ?? "", date: today }}
-        className="flex items-center justify-center gap-2 rounded-2xl gradient-primary text-primary-foreground py-4 text-sm font-medium shadow-lg btn-press"
+      <button
+        type="button"
+        onClick={handleFinish}
+        disabled={isSaving}
+        className="w-full flex items-center justify-center gap-2 rounded-2xl gradient-primary text-primary-foreground py-4 text-sm font-medium shadow-lg btn-press disabled:opacity-50"
       >
         <ListChecks className="h-4 w-4" />
-        Finish · View absentees
-      </Link>
+        {isSaving ? "Saving register..." : "Finish · View absentees"}
+      </button>
     </div>
   );
 }
