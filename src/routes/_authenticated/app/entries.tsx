@@ -544,30 +544,32 @@ function RegisterEntriesPage() {
             </div>
 
             {/* Separate Option Toggle for Interactive Excel Editor (as requested by user) */}
-            <div className="flex items-center gap-2">
+            <div className="flex flex-col gap-1.5 sm:flex-row sm:items-center sm:gap-2">
               <span className="text-xs text-muted-foreground font-medium">Display Mode:</span>
-              <div className="inline-flex rounded-xl bg-muted p-1 border gap-1">
+              <div className="inline-flex w-full sm:w-auto rounded-xl bg-muted p-1 border gap-1">
                 <button
                   onClick={() => setMode("standard")}
-                  className={`flex items-center gap-1.5 px-3 py-1 rounded-lg text-xs font-semibold transition-all ${
+                  className={`flex flex-1 sm:flex-none items-center justify-center gap-1.5 px-3 py-1.5 sm:py-1 rounded-lg text-xs font-semibold transition-all whitespace-nowrap ${
                     mode === "standard"
                       ? "gradient-primary text-primary-foreground shadow-sm"
                       : "text-muted-foreground hover:text-foreground"
                   }`}
                 >
-                  <LayoutGrid className="h-3.5 w-3.5" />
-                  Standard Overview
+                  <LayoutGrid className="h-3.5 w-3.5 shrink-0" />
+                  <span className="hidden sm:inline">Standard Overview</span>
+                  <span className="sm:hidden">Standard</span>
                 </button>
                 <button
                   onClick={() => setMode("excel")}
-                  className={`flex items-center gap-1.5 px-3 py-1 rounded-lg text-xs font-semibold transition-all ${
+                  className={`flex flex-1 sm:flex-none items-center justify-center gap-1.5 px-3 py-1.5 sm:py-1 rounded-lg text-xs font-semibold transition-all whitespace-nowrap ${
                     mode === "excel"
                       ? "gradient-primary text-primary-foreground shadow-sm"
                       : "text-muted-foreground hover:text-foreground"
                   }`}
                 >
-                  <FileSpreadsheet className="h-3.5 w-3.5" />
-                  📊 Excel Grid Editor
+                  <FileSpreadsheet className="h-3.5 w-3.5 shrink-0" />
+                  <span className="hidden sm:inline">📊 Excel Grid Editor</span>
+                  <span className="sm:hidden">Excel Grid</span>
                 </button>
               </div>
             </div>
