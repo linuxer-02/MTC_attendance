@@ -342,7 +342,7 @@ function RegisterEntriesPage() {
       queryClient.invalidateQueries({ queryKey: ["att-month-register"] });
       queryClient.invalidateQueries({ queryKey: ["att-week"] });
     },
-    onError: (err: any) => {
+    onError: (err: Error) => {
       toast.error("Failed to save changes: " + err.message);
     },
   });
@@ -375,7 +375,7 @@ function RegisterEntriesPage() {
       queryClient.invalidateQueries({ queryKey: ["att-week"] });
       queryClient.invalidateQueries({ queryKey: ["att-month-register"] });
     },
-    onError: (err: any) => {
+    onError: (err: Error) => {
       toast.error("Failed to save day attendance: " + err.message);
     },
   });
@@ -408,8 +408,9 @@ function RegisterEntriesPage() {
       const filename = `Attendance_${selectedClass.dept_name}_${selectedClass.name}_${selectedMonth}.csv`;
       downloadCSV(csv, filename);
       toast.success(`Excel sheet downloaded: ${filename}`);
-    } catch (err: any) {
-      toast.error("Export failed: " + err.message);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Unknown error";
+      toast.error("Export failed: " + message);
     }
   };
 
@@ -625,12 +626,15 @@ function RegisterEntriesPage() {
               <div className="rounded-xl bg-muted border p-2.5 text-center">
                 {(() => {
                   const pct = Math.round(
-                    (students.filter((s) => (dayEdits.get(s.id) ?? "present") === "present").length /
+                    (students.filter((s) => (dayEdits.get(s.id) ?? "present") === "present")
+                      .length /
                       students.length) *
                       100,
                   );
                   return (
-                    <div className={`text-lg font-bold ${pct >= 75 ? "text-success" : "text-destructive"}`}>
+                    <div
+                      className={`text-lg font-bold ${pct >= 75 ? "text-success" : "text-destructive"}`}
+                    >
                       {pct}%
                     </div>
                   );
@@ -642,7 +646,6 @@ function RegisterEntriesPage() {
 
           {/* Desktop: 2-col (stats + list) · Mobile: stacked */}
           <div className="lg:grid lg:grid-cols-[280px_1fr] lg:gap-6 space-y-4 lg:space-y-0 items-start">
-
             {/* Left stats panel — desktop only */}
             {students && students.length > 0 && (
               <div className="hidden lg:block sticky top-20 space-y-3">
@@ -654,20 +657,31 @@ function RegisterEntriesPage() {
                   <div className="grid grid-cols-2 gap-3">
                     <div className="rounded-xl bg-success/10 border border-success/20 p-3 text-center">
                       <div className="text-2xl font-bold text-success">
-                        {students.filter((s) => (dayEdits.get(s.id) ?? "present") === "present").length}
+                        {
+                          students.filter((s) => (dayEdits.get(s.id) ?? "present") === "present")
+                            .length
+                        }
                       </div>
-                      <div className="text-[10px] text-success/70 uppercase tracking-wide mt-0.5">Present</div>
+                      <div className="text-[10px] text-success/70 uppercase tracking-wide mt-0.5">
+                        Present
+                      </div>
                     </div>
                     <div className="rounded-xl bg-destructive/10 border border-destructive/20 p-3 text-center">
                       <div className="text-2xl font-bold text-destructive">
-                        {students.filter((s) => (dayEdits.get(s.id) ?? "present") === "absent").length}
+                        {
+                          students.filter((s) => (dayEdits.get(s.id) ?? "present") === "absent")
+                            .length
+                        }
                       </div>
-                      <div className="text-[10px] text-destructive/70 uppercase tracking-wide mt-0.5">Absent</div>
+                      <div className="text-[10px] text-destructive/70 uppercase tracking-wide mt-0.5">
+                        Absent
+                      </div>
                     </div>
                   </div>
                   {(() => {
                     const pct = Math.round(
-                      (students.filter((s) => (dayEdits.get(s.id) ?? "present") === "present").length /
+                      (students.filter((s) => (dayEdits.get(s.id) ?? "present") === "present")
+                        .length /
                         students.length) *
                         100,
                     );
@@ -675,7 +689,9 @@ function RegisterEntriesPage() {
                       <div>
                         <div className="flex items-center justify-between text-xs mb-1.5">
                           <span className="text-muted-foreground">Attendance rate</span>
-                          <span className={`font-bold ${pct >= 75 ? "text-success" : "text-destructive"}`}>
+                          <span
+                            className={`font-bold ${pct >= 75 ? "text-success" : "text-destructive"}`}
+                          >
                             {pct}%
                           </span>
                         </div>
@@ -684,7 +700,8 @@ function RegisterEntriesPage() {
                             className="h-full rounded-full transition-all duration-500"
                             style={{
                               width: `${pct}%`,
-                              background: pct >= 75 ? "var(--color-success)" : "var(--color-destructive)",
+                              background:
+                                pct >= 75 ? "var(--color-success)" : "var(--color-destructive)",
                             }}
                           />
                         </div>
@@ -733,9 +750,13 @@ function RegisterEntriesPage() {
                                 }`}
                               >
                                 {isPresent ? (
-                                  <><CheckCircle2 className="h-3.5 w-3.5" /> Present</>
+                                  <>
+                                    <CheckCircle2 className="h-3.5 w-3.5" /> Present
+                                  </>
                                 ) : (
-                                  <><XCircle className="h-3.5 w-3.5" /> Absent</>
+                                  <>
+                                    <XCircle className="h-3.5 w-3.5" /> Absent
+                                  </>
                                 )}
                               </button>
                             </td>
@@ -807,7 +828,9 @@ function RegisterEntriesPage() {
                         key={student.id}
                         className={`transition-colors hover:bg-muted/30 ${isAtRisk ? "bg-destructive/[0.03]" : ""}`}
                       >
-                        <td className="px-4 py-3.5 font-mono text-xs text-muted-foreground">{student.roll_no}</td>
+                        <td className="px-4 py-3.5 font-mono text-xs text-muted-foreground">
+                          {student.roll_no}
+                        </td>
                         <td className="px-4 py-3.5 font-medium">
                           <div className="flex items-center gap-2">
                             {student.name}
@@ -822,7 +845,9 @@ function RegisterEntriesPage() {
                           <span className="font-semibold text-success">{present}</span>
                         </td>
                         <td className="px-4 py-3.5 text-center hidden sm:table-cell">
-                          <span className={`font-semibold ${absent > 0 ? "text-destructive" : "text-muted-foreground"}`}>
+                          <span
+                            className={`font-semibold ${absent > 0 ? "text-destructive" : "text-muted-foreground"}`}
+                          >
                             {absent}
                           </span>
                         </td>
@@ -836,7 +861,8 @@ function RegisterEntriesPage() {
                                 className="h-full rounded-full transition-all"
                                 style={{
                                   width: `${pct}%`,
-                                  background: pct >= 75 ? "var(--color-success)" : "var(--color-destructive)",
+                                  background:
+                                    pct >= 75 ? "var(--color-success)" : "var(--color-destructive)",
                                 }}
                               />
                             </div>
@@ -912,19 +938,20 @@ function RegisterEntriesPage() {
               <table className="w-full text-xs border-separate border-spacing-0">
                 <thead>
                   <tr className="bg-muted/80 border-b text-muted-foreground font-semibold">
-                    {/* Sticky: Roll No */}
-                    <th className="sticky left-0 z-20 bg-muted/95 px-3 py-3 text-left w-28 border-r text-[11px] uppercase tracking-wide whitespace-nowrap">
+                    {/* Sticky: Roll No — hidden on mobile, the roll is inlined into the
+                        name cell instead so the frozen columns don't eat the whole viewport */}
+                    <th className="hidden sm:table-cell sticky left-0 z-20 bg-muted/95 px-3 py-3 text-left w-28 border-r text-[11px] uppercase tracking-wide whitespace-nowrap">
                       Roll No
                     </th>
                     {/* Sticky: Name */}
-                    <th className="sticky left-28 z-20 bg-muted/95 px-4 py-3 text-left w-52 border-r text-[11px] uppercase tracking-wide whitespace-nowrap shadow-[2px_0_8px_-2px_rgba(0,0,0,0.12)]">
-                      Student Name
+                    <th className="sticky left-0 sm:left-28 z-20 bg-muted/95 px-2 sm:px-4 py-3 text-left w-32 sm:w-52 border-r text-[11px] uppercase tracking-wide whitespace-nowrap shadow-[2px_0_8px_-2px_rgba(0,0,0,0.12)]">
+                      Student
                     </th>
                     {/* Day columns */}
                     {daysInMonth.map((d) => (
                       <th
                         key={d.date}
-                        className={`p-2 text-center min-w-[52px] border-r align-top ${
+                        className={`p-1 sm:p-2 text-center min-w-[40px] sm:min-w-[52px] border-r align-top ${
                           d.isSunday
                             ? "bg-muted/50 text-muted-foreground/50"
                             : d.isHoliday
@@ -957,7 +984,7 @@ function RegisterEntriesPage() {
                       </th>
                     ))}
                     {/* Sticky right: student summary */}
-                    <th className="sticky right-0 z-20 bg-muted/95 px-3 py-3 text-center min-w-[72px] border-l text-[11px] uppercase tracking-wide whitespace-nowrap shadow-[-2px_0_8px_-2px_rgba(0,0,0,0.12)]">
+                    <th className="sticky right-0 z-20 bg-muted/95 px-2 sm:px-3 py-3 text-center min-w-[54px] sm:min-w-[72px] border-l text-[11px] uppercase tracking-wide whitespace-nowrap shadow-[-2px_0_8px_-2px_rgba(0,0,0,0.12)]">
                       Total %
                     </th>
                   </tr>
@@ -987,11 +1014,14 @@ function RegisterEntriesPage() {
                         className={`transition-colors hover:bg-muted/20 ${isAtRisk ? "bg-destructive/[0.03]" : ""}`}
                       >
                         {/* Sticky: Roll No */}
-                        <td className="sticky left-0 z-10 bg-card px-3 py-2.5 font-mono text-[11px] text-muted-foreground border-r font-medium whitespace-nowrap">
+                        <td className="hidden sm:table-cell sticky left-0 z-10 bg-card px-3 py-2.5 font-mono text-[11px] text-muted-foreground border-r font-medium whitespace-nowrap">
                           {student.roll_no}
                         </td>
-                        {/* Sticky: Name */}
-                        <td className="sticky left-28 z-10 bg-card px-4 py-2.5 font-medium border-r max-w-[208px] truncate shadow-[2px_0_8px_-2px_rgba(0,0,0,0.12)] whitespace-nowrap">
+                        {/* Sticky: Name (roll inlined on mobile, where its own column is hidden) */}
+                        <td className="sticky left-0 sm:left-28 z-10 bg-card px-2 sm:px-4 py-2.5 font-medium border-r max-w-[128px] sm:max-w-[208px] truncate shadow-[2px_0_8px_-2px_rgba(0,0,0,0.12)] whitespace-nowrap">
+                          <span className="sm:hidden font-mono text-[10px] text-muted-foreground mr-1">
+                            {student.roll_no}
+                          </span>
                           {student.name}
                         </td>
                         {/* Day cells */}
@@ -1004,7 +1034,7 @@ function RegisterEntriesPage() {
                             <td
                               key={d.date}
                               onClick={() => toggleCell(student.id, d.date, status)}
-                              className={`p-1.5 text-center border-r select-none transition-all ${
+                              className={`p-1 sm:p-1.5 text-center border-r select-none transition-all ${
                                 d.isSunday
                                   ? "bg-muted/20 cursor-not-allowed"
                                   : d.isHoliday
@@ -1015,19 +1045,22 @@ function RegisterEntriesPage() {
                               {d.isSunday ? (
                                 <span className="text-[10px] text-muted-foreground/40">S</span>
                               ) : d.isHoliday ? (
-                                <span className="text-[10px] text-accent font-bold" title={d.holidayReason}>
+                                <span
+                                  className="text-[10px] text-accent font-bold"
+                                  title={d.holidayReason}
+                                >
                                   H
                                 </span>
                               ) : status === "present" ? (
-                                <span className="inline-flex items-center justify-center w-7 h-7 rounded-md bg-success text-success-foreground text-[11px] font-bold">
+                                <span className="inline-flex items-center justify-center w-6 h-6 sm:w-7 sm:h-7 rounded-md bg-success text-success-foreground text-[10px] sm:text-[11px] font-bold">
                                   P
                                 </span>
                               ) : status === "absent" ? (
-                                <span className="inline-flex items-center justify-center w-7 h-7 rounded-md bg-destructive text-destructive-foreground text-[11px] font-bold">
+                                <span className="inline-flex items-center justify-center w-6 h-6 sm:w-7 sm:h-7 rounded-md bg-destructive text-destructive-foreground text-[10px] sm:text-[11px] font-bold">
                                   A
                                 </span>
                               ) : (
-                                <span className="inline-flex items-center justify-center w-7 h-7 rounded-md bg-muted/60 text-muted-foreground/40 text-[11px]">
+                                <span className="inline-flex items-center justify-center w-6 h-6 sm:w-7 sm:h-7 rounded-md bg-muted/60 text-muted-foreground/40 text-[10px] sm:text-[11px]">
                                   –
                                 </span>
                               )}
@@ -1035,8 +1068,10 @@ function RegisterEntriesPage() {
                           );
                         })}
                         {/* Sticky right: per-student summary */}
-                        <td className="sticky right-0 z-10 bg-card border-l px-3 py-2.5 text-center shadow-[-2px_0_8px_-2px_rgba(0,0,0,0.12)]">
-                          <div className={`text-xs font-bold ${isAtRisk ? "text-destructive" : "text-success"}`}>
+                        <td className="sticky right-0 z-10 bg-card border-l px-2 sm:px-3 py-2.5 text-center shadow-[-2px_0_8px_-2px_rgba(0,0,0,0.12)]">
+                          <div
+                            className={`text-xs font-bold ${isAtRisk ? "text-destructive" : "text-success"}`}
+                          >
                             {studentPct}%
                           </div>
                           <div className="text-[10px] text-muted-foreground leading-none mt-0.5">
@@ -1050,11 +1085,12 @@ function RegisterEntriesPage() {
                   {/* Per-day totals summary row */}
                   {students && students.length > 0 && (
                     <tr className="bg-muted/60 border-t-2 border-muted-foreground/20">
-                      <td className="sticky left-0 z-10 bg-muted/80 px-3 py-2.5 text-[11px] font-semibold text-muted-foreground border-r whitespace-nowrap">
+                      <td className="hidden sm:table-cell sticky left-0 z-10 bg-muted/80 px-3 py-2.5 text-[11px] font-semibold text-muted-foreground border-r whitespace-nowrap">
                         Present/day
                       </td>
-                      <td className="sticky left-28 z-10 bg-muted/80 px-4 py-2.5 text-[11px] text-muted-foreground border-r shadow-[2px_0_8px_-2px_rgba(0,0,0,0.12)] whitespace-nowrap">
-                        {students.length} students
+                      <td className="sticky left-0 sm:left-28 z-10 bg-muted/80 px-2 sm:px-4 py-2.5 text-[11px] text-muted-foreground border-r shadow-[2px_0_8px_-2px_rgba(0,0,0,0.12)] whitespace-nowrap">
+                        <span className="sm:hidden font-semibold">Present/day</span>
+                        <span className="hidden sm:inline">{students.length} students</span>
                       </td>
                       {daysInMonth.map((d) => {
                         if (d.isSunday)
@@ -1070,11 +1106,12 @@ function RegisterEntriesPage() {
                             </td>
                           );
                         const dayPresent = students.filter(
-                          (s) => (currentMatrixMap.get(`${s.id}|${d.date}`) ?? "unmarked") === "present",
+                          (s) =>
+                            (currentMatrixMap.get(`${s.id}|${d.date}`) ?? "unmarked") === "present",
                         ).length;
                         const dayPct = Math.round((dayPresent / students.length) * 100);
                         return (
-                          <td key={d.date} className="p-1.5 text-center border-r">
+                          <td key={d.date} className="p-1 sm:p-1.5 text-center border-r">
                             <div
                               className={`text-[11px] font-bold ${
                                 dayPct >= 75
@@ -1089,7 +1126,7 @@ function RegisterEntriesPage() {
                           </td>
                         );
                       })}
-                      <td className="sticky right-0 z-10 bg-muted/80 border-l px-3 py-2.5 text-center shadow-[-2px_0_8px_-2px_rgba(0,0,0,0.12)]">
+                      <td className="sticky right-0 z-10 bg-muted/80 border-l px-2 sm:px-3 py-2.5 text-center shadow-[-2px_0_8px_-2px_rgba(0,0,0,0.12)]">
                         <div className="text-[10px] text-muted-foreground font-medium">/day</div>
                       </td>
                     </tr>
@@ -1102,30 +1139,45 @@ function RegisterEntriesPage() {
             <div className="px-4 py-3 bg-muted/30 border-t flex flex-wrap items-center justify-between gap-3">
               <div className="flex items-center gap-4 text-xs text-muted-foreground flex-wrap">
                 <span className="flex items-center gap-1.5">
-                  <span className="w-5 h-5 rounded-md bg-success text-success-foreground text-[9px] font-bold flex items-center justify-center">P</span>
+                  <span className="w-5 h-5 rounded-md bg-success text-success-foreground text-[9px] font-bold flex items-center justify-center">
+                    P
+                  </span>
                   Present
                 </span>
                 <span className="flex items-center gap-1.5">
-                  <span className="w-5 h-5 rounded-md bg-destructive text-destructive-foreground text-[9px] font-bold flex items-center justify-center">A</span>
+                  <span className="w-5 h-5 rounded-md bg-destructive text-destructive-foreground text-[9px] font-bold flex items-center justify-center">
+                    A
+                  </span>
                   Absent
                 </span>
                 <span className="flex items-center gap-1.5">
-                  <span className="w-5 h-5 rounded-md bg-accent/20 text-accent text-[9px] font-bold flex items-center justify-center">H</span>
+                  <span className="w-5 h-5 rounded-md bg-accent/20 text-accent text-[9px] font-bold flex items-center justify-center">
+                    H
+                  </span>
                   Holiday
                 </span>
                 <span className="flex items-center gap-1.5">
-                  <span className="w-5 h-5 rounded-md bg-muted/60 text-muted-foreground/50 text-[9px] flex items-center justify-center">–</span>
+                  <span className="w-5 h-5 rounded-md bg-muted/60 text-muted-foreground/50 text-[9px] flex items-center justify-center">
+                    –
+                  </span>
                   Unmarked
                 </span>
                 {unsavedCount > 0 && (
                   <span className="flex items-center gap-1.5 text-primary font-medium">
-                    <span className="w-5 h-5 rounded-md ring-2 ring-primary bg-card text-[9px] flex items-center justify-center">✎</span>
+                    <span className="w-5 h-5 rounded-md ring-2 ring-primary bg-card text-[9px] flex items-center justify-center">
+                      ✎
+                    </span>
                     Unsaved edit
                   </span>
                 )}
               </div>
               <p className="text-[11px] text-muted-foreground hidden sm:block">
-                💡 Click a cell to cycle: Present → Absent → Unmarked · Use P/A buttons for bulk column edits
+                💡 Click a cell to cycle: Present → Absent → Unmarked · Use P/A buttons for bulk
+                column edits
+              </p>
+              <p className="text-[11px] text-muted-foreground sm:hidden">
+                💡 Tap a cell to cycle: Present → Absent → Unmarked · Swipe the grid sideways for
+                more days
               </p>
             </div>
           </div>
