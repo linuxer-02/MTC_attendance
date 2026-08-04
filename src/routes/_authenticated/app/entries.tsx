@@ -502,27 +502,27 @@ function RegisterEntriesPage() {
           </select>
 
           {/* Day vs Month View Switcher */}
-          <div className="inline-flex rounded-xl bg-muted p-1 border gap-1">
+          <div className="inline-flex w-full sm:w-auto rounded-xl bg-muted p-1 border gap-1">
             <button
               onClick={() => setView("month")}
-              className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg text-xs font-semibold transition-all ${
+              className={`flex flex-1 sm:flex-none items-center justify-center gap-1.5 px-3.5 py-1.5 rounded-lg text-xs font-semibold transition-all whitespace-nowrap ${
                 view === "month"
                   ? "bg-card text-foreground shadow-sm"
                   : "text-muted-foreground hover:text-foreground"
               }`}
             >
-              <CalendarDays className="h-3.5 w-3.5 text-primary" />
+              <CalendarDays className="h-3.5 w-3.5 text-primary shrink-0" />
               Month View
             </button>
             <button
               onClick={() => setView("day")}
-              className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg text-xs font-semibold transition-all ${
+              className={`flex flex-1 sm:flex-none items-center justify-center gap-1.5 px-3.5 py-1.5 rounded-lg text-xs font-semibold transition-all whitespace-nowrap ${
                 view === "day"
                   ? "bg-card text-foreground shadow-sm"
                   : "text-muted-foreground hover:text-foreground"
               }`}
             >
-              <Calendar className="h-3.5 w-3.5 text-primary" />
+              <Calendar className="h-3.5 w-3.5 text-primary shrink-0" />
               Day View
             </button>
           </div>
@@ -575,7 +575,7 @@ function RegisterEntriesPage() {
             </div>
           </div>
         ) : (
-          <div className="flex items-center gap-3 pt-2 border-t">
+          <div className="flex flex-col sm:flex-row gap-2 sm:items-center sm:gap-3 pt-2 border-t">
             <label className="text-xs font-semibold uppercase text-muted-foreground tracking-wide">
               Select Past Date:
             </label>
@@ -583,7 +583,7 @@ function RegisterEntriesPage() {
               type="date"
               value={selectedDate}
               onChange={(e) => setSelectedDate(e.target.value)}
-              className="rounded-xl border bg-background px-3.5 py-2 text-sm font-medium"
+              className="w-full sm:w-auto rounded-xl border bg-background px-3.5 py-2 text-sm font-medium"
             />
           </div>
         )}
@@ -606,6 +606,39 @@ function RegisterEntriesPage() {
               {saveDayMutation.isPending ? "Saving..." : "Save Day Register"}
             </button>
           </div>
+
+          {/* Compact stats row — mobile/tablet only */}
+          {students && students.length > 0 && (
+            <div className="grid grid-cols-3 gap-2 lg:hidden">
+              <div className="rounded-xl bg-success/10 border border-success/20 p-2.5 text-center">
+                <div className="text-lg font-bold text-success">
+                  {students.filter((s) => (dayEdits.get(s.id) ?? "present") === "present").length}
+                </div>
+                <div className="text-[9px] text-success/70 uppercase tracking-wide">Present</div>
+              </div>
+              <div className="rounded-xl bg-destructive/10 border border-destructive/20 p-2.5 text-center">
+                <div className="text-lg font-bold text-destructive">
+                  {students.filter((s) => (dayEdits.get(s.id) ?? "present") === "absent").length}
+                </div>
+                <div className="text-[9px] text-destructive/70 uppercase tracking-wide">Absent</div>
+              </div>
+              <div className="rounded-xl bg-muted border p-2.5 text-center">
+                {(() => {
+                  const pct = Math.round(
+                    (students.filter((s) => (dayEdits.get(s.id) ?? "present") === "present").length /
+                      students.length) *
+                      100,
+                  );
+                  return (
+                    <div className={`text-lg font-bold ${pct >= 75 ? "text-success" : "text-destructive"}`}>
+                      {pct}%
+                    </div>
+                  );
+                })()}
+                <div className="text-[9px] text-muted-foreground uppercase tracking-wide">Rate</div>
+              </div>
+            </div>
+          )}
 
           {/* Desktop: 2-col (stats + list) · Mobile: stacked */}
           <div className="lg:grid lg:grid-cols-[280px_1fr] lg:gap-6 space-y-4 lg:space-y-0 items-start">
@@ -668,46 +701,50 @@ function RegisterEntriesPage() {
             {/* Student list — full-width on mobile, right col on desktop */}
             <div className="rounded-2xl border bg-card shadow-sm overflow-hidden">
               {students && students.length > 0 ? (
-                <table className="w-full text-sm">
-                  <thead>
-                    <tr className="border-b bg-muted/60 text-[11px] text-muted-foreground font-semibold uppercase tracking-wide">
-                      <th className="px-4 py-3 text-left w-28">Roll No</th>
-                      <th className="px-4 py-3 text-left">Name</th>
-                      <th className="px-4 py-3 text-right">Status</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y">
-                    {students.map((s) => {
-                      const status = dayEdits.get(s.id) ?? "present";
-                      const isPresent = status === "present";
-                      return (
-                        <tr
-                          key={s.id}
-                          className={`transition-colors hover:bg-muted/30 ${!isPresent ? "bg-destructive/[0.04]" : ""}`}
-                        >
-                          <td className="px-4 py-3 font-mono text-xs text-muted-foreground">{s.roll_no}</td>
-                          <td className="px-4 py-3 font-medium">{s.name}</td>
-                          <td className="px-3 py-2.5 text-right">
-                            <button
-                              onClick={() => toggleDayStudent(s.id)}
-                              className={`inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all btn-press ${
-                                isPresent
-                                  ? "bg-success/15 text-success border border-success/30 hover:bg-success/25"
-                                  : "bg-destructive/15 text-destructive border border-destructive/30 hover:bg-destructive/25"
-                              }`}
-                            >
-                              {isPresent ? (
-                                <><CheckCircle2 className="h-3.5 w-3.5" /> Present</>
-                              ) : (
-                                <><XCircle className="h-3.5 w-3.5" /> Absent</>
-                              )}
-                            </button>
-                          </td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="border-b bg-muted/60 text-[11px] text-muted-foreground font-semibold uppercase tracking-wide">
+                        <th className="px-4 py-3 text-left w-28">Roll No</th>
+                        <th className="px-4 py-3 text-left">Name</th>
+                        <th className="px-4 py-3 text-right">Status</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y">
+                      {students.map((s) => {
+                        const status = dayEdits.get(s.id) ?? "present";
+                        const isPresent = status === "present";
+                        return (
+                          <tr
+                            key={s.id}
+                            className={`transition-colors hover:bg-muted/30 ${!isPresent ? "bg-destructive/[0.04]" : ""}`}
+                          >
+                            <td className="px-4 py-3 font-mono text-xs text-muted-foreground whitespace-nowrap">
+                              {s.roll_no}
+                            </td>
+                            <td className="px-4 py-3 font-medium whitespace-nowrap">{s.name}</td>
+                            <td className="px-3 py-2.5 text-right">
+                              <button
+                                onClick={() => toggleDayStudent(s.id)}
+                                className={`inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all btn-press whitespace-nowrap ${
+                                  isPresent
+                                    ? "bg-success/15 text-success border border-success/30 hover:bg-success/25"
+                                    : "bg-destructive/15 text-destructive border border-destructive/30 hover:bg-destructive/25"
+                                }`}
+                              >
+                                {isPresent ? (
+                                  <><CheckCircle2 className="h-3.5 w-3.5" /> Present</>
+                                ) : (
+                                  <><XCircle className="h-3.5 w-3.5" /> Absent</>
+                                )}
+                              </button>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
               ) : (
                 <div className="text-center py-12 text-sm text-muted-foreground">
                   No students found in this class.
@@ -725,14 +762,14 @@ function RegisterEntriesPage() {
         <div className="space-y-4">
           <div className="rounded-2xl border bg-card shadow-sm overflow-hidden">
             {/* Card header */}
-            <div className="px-5 py-4 border-b flex items-center justify-between">
-              <h2 className="text-xl display flex items-center gap-2">
+            <div className="px-5 py-4 border-b flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+              <h2 className="text-lg sm:text-xl display flex flex-wrap items-center gap-2">
                 Monthly Overview
-                <span className="text-muted-foreground text-base font-normal">
+                <span className="text-muted-foreground text-sm sm:text-base font-normal">
                   ({format(monthStart, "MMMM yyyy")})
                 </span>
               </h2>
-              <span className="text-xs text-muted-foreground bg-muted px-2.5 py-1 rounded-full font-medium">
+              <span className="text-xs text-muted-foreground bg-muted px-2.5 py-1 rounded-full font-medium self-start sm:self-auto">
                 {students?.length ?? 0} students
               </span>
             </div>
@@ -843,7 +880,7 @@ function RegisterEntriesPage() {
                   </span>
                 )}
               </div>
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2 flex-wrap">
                 <label className="flex items-center gap-1.5 px-3 py-2 rounded-xl border bg-muted/60 text-xs font-medium hover:bg-muted cursor-pointer transition-colors btn-press">
                   <Upload className="h-3.5 w-3.5 text-primary" />
                   Import CSV
@@ -868,7 +905,11 @@ function RegisterEntriesPage() {
           {/* Spreadsheet matrix */}
           <div className="rounded-2xl border bg-card shadow-sm overflow-hidden">
             <div className="overflow-x-auto">
-              <table className="w-full text-xs border-collapse">
+              {/* border-separate (not border-collapse) so the sticky Roll No/Name/Total%
+                  columns actually stick — sticky positioning is broken by border-collapse
+                  in every browser, which is what made this grid unscrollable-with-context
+                  on mobile. border-spacing-0 keeps the visual seams identical to collapsed. */}
+              <table className="w-full text-xs border-separate border-spacing-0">
                 <thead>
                   <tr className="bg-muted/80 border-b text-muted-foreground font-semibold">
                     {/* Sticky: Roll No */}
@@ -896,7 +937,7 @@ function RegisterEntriesPage() {
                         </div>
                         <div className="text-sm font-bold leading-tight mt-0.5">{d.dayNum}</div>
                         {!d.isSunday && !d.isHoliday && (
-                          <div className="flex justify-center gap-0.5 mt-1.5">
+                          <div className="hidden sm:flex justify-center gap-0.5 mt-1.5">
                             <button
                               onClick={() => setColumnStatus(d.date, "present")}
                               title="Mark all Present"
