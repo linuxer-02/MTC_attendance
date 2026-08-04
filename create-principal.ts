@@ -38,20 +38,19 @@ function loadEnv() {
 
 loadEnv();
 
-const SUPABASE_URL =
-  process.env.VITE_SUPABASE_URL ||
-  process.env.SUPABASE_URL ||
-  "https://yazlbclgbbjgqtxedktj.supabase.co";
+const SUPABASE_URL = process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL;
 const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_KEY;
+const email = process.env.PRINCIPAL_EMAIL;
+const password = process.env.PRINCIPAL_PASSWORD;
 
-if (!SUPABASE_SERVICE_KEY) {
-  console.error("ERROR: SUPABASE_SERVICE_KEY is required!");
-  console.error(
-    "Please add it to your local .env file: SUPABASE_SERVICE_KEY='your-service-role-key'",
-  );
-  console.error(
-    "Or set it in your environment: export SUPABASE_SERVICE_KEY='your-service-role-key'",
-  );
+if (!SUPABASE_URL || !SUPABASE_SERVICE_KEY || !email || !password) {
+  console.error("ERROR: Missing required environment variables.");
+  console.error("Set all of the following before running this script:");
+  console.error("  SUPABASE_URL (or VITE_SUPABASE_URL)");
+  console.error("  SUPABASE_SERVICE_KEY");
+  console.error("  PRINCIPAL_EMAIL");
+  console.error("  PRINCIPAL_PASSWORD");
+  console.error("Example: PRINCIPAL_EMAIL=you@college.edu PRINCIPAL_PASSWORD=... npx tsx create-principal.ts");
   process.exit(1);
 }
 
@@ -60,8 +59,6 @@ const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY);
 async function main() {
   try {
     console.log("Creating principal user...");
-    const email = "principal@mtcchennai.com";
-    const password = "Principal@SmartAttend2026!";
 
     const { data: authData, error: authError } = await supabase.auth.admin.createUser({
       email,
@@ -105,7 +102,7 @@ async function assignRole(userId: string | undefined) {
     const { error: profileError } = await supabase.from("profiles").upsert({
       id: userId,
       full_name: "Principal",
-      email: "principal@mtcchennai.com",
+      email,
     });
 
     if (profileError) {
@@ -130,9 +127,7 @@ async function assignRole(userId: string | undefined) {
 
     console.log("✓ Role assigned successfully!");
     console.log("\n✅ SETUP COMPLETE!");
-    console.log("Principal can now login with:");
-    console.log("  Email: principal@mtcchennai.com");
-    console.log("  Password: Principal@SmartAttend2026!");
+    console.log(`Principal can now login with the credentials you provided (${email}).`);
   } catch (error) {
     console.error("Fatal error:", error instanceof Error ? error.message : error);
     process.exit(1);

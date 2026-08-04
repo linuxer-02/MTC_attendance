@@ -592,7 +592,8 @@ function RegisterEntriesPage() {
       {/* ============================================================ */}
       {view === "day" && (
         <div className="space-y-4">
-          <div className="flex items-center justify-between">
+          {/* Header */}
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
             <h2 className="text-xl display">Register for {prettyDate(selectedDate)}</h2>
             <button
               onClick={() => saveDayMutation.mutate()}
@@ -604,54 +605,113 @@ function RegisterEntriesPage() {
             </button>
           </div>
 
-          {/* Student Status List */}
-          <div className="rounded-2xl border bg-card p-4 shadow-sm space-y-2">
-            {students && students.length > 0 ? (
-              <div className="divide-y">
-                {students.map((s) => {
-                  const status = dayEdits.get(s.id) ?? "present";
-                  const isPresent = status === "present";
-                  return (
-                    <div
-                      key={s.id}
-                      className="flex items-center justify-between py-3 px-1 hover:bg-muted/40 rounded-xl transition-colors"
-                    >
-                      <div className="flex items-center gap-3 min-w-0">
-                        <span className="font-mono text-xs text-muted-foreground w-16 truncate shrink-0">
-                          {s.roll_no}
-                        </span>
-                        <span className="font-medium text-sm truncate">{s.name}</span>
-                      </div>
+          {/* Desktop: 2-col (stats + list) · Mobile: stacked */}
+          <div className="lg:grid lg:grid-cols-[280px_1fr] lg:gap-6 space-y-4 lg:space-y-0 items-start">
 
-                      <div className="flex items-center gap-1.5 shrink-0">
-                        <button
-                          onClick={() => toggleDayStudent(s.id)}
-                          className={`flex items-center gap-1 px-3 py-1.5 rounded-xl text-xs font-bold transition-all btn-press ${
-                            isPresent
-                              ? "bg-success/15 text-success border border-success/30"
-                              : "bg-destructive/15 text-destructive border border-destructive/30"
-                          }`}
-                        >
-                          {isPresent ? (
-                            <>
-                              <CheckCircle2 className="h-3.5 w-3.5" /> Present
-                            </>
-                          ) : (
-                            <>
-                              <XCircle className="h-3.5 w-3.5" /> Absent
-                            </>
-                          )}
-                        </button>
+            {/* Left stats panel — desktop only */}
+            {students && students.length > 0 && (
+              <div className="hidden lg:block sticky top-20 space-y-3">
+                <div className="rounded-2xl border bg-card p-5 shadow-sm space-y-5">
+                  <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider flex items-center gap-1.5">
+                    <CheckCircle2 className="h-3.5 w-3.5 text-primary" />
+                    Day Summary
+                  </h3>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="rounded-xl bg-success/10 border border-success/20 p-3 text-center">
+                      <div className="text-2xl font-bold text-success">
+                        {students.filter((s) => (dayEdits.get(s.id) ?? "present") === "present").length}
                       </div>
+                      <div className="text-[10px] text-success/70 uppercase tracking-wide mt-0.5">Present</div>
                     </div>
-                  );
-                })}
-              </div>
-            ) : (
-              <div className="text-center py-8 text-sm text-muted-foreground">
-                No students found in this class.
+                    <div className="rounded-xl bg-destructive/10 border border-destructive/20 p-3 text-center">
+                      <div className="text-2xl font-bold text-destructive">
+                        {students.filter((s) => (dayEdits.get(s.id) ?? "present") === "absent").length}
+                      </div>
+                      <div className="text-[10px] text-destructive/70 uppercase tracking-wide mt-0.5">Absent</div>
+                    </div>
+                  </div>
+                  {(() => {
+                    const pct = Math.round(
+                      (students.filter((s) => (dayEdits.get(s.id) ?? "present") === "present").length /
+                        students.length) *
+                        100,
+                    );
+                    return (
+                      <div>
+                        <div className="flex items-center justify-between text-xs mb-1.5">
+                          <span className="text-muted-foreground">Attendance rate</span>
+                          <span className={`font-bold ${pct >= 75 ? "text-success" : "text-destructive"}`}>
+                            {pct}%
+                          </span>
+                        </div>
+                        <div className="h-2.5 w-full bg-muted rounded-full overflow-hidden">
+                          <div
+                            className="h-full rounded-full transition-all duration-500"
+                            style={{
+                              width: `${pct}%`,
+                              background: pct >= 75 ? "var(--color-success)" : "var(--color-destructive)",
+                            }}
+                          />
+                        </div>
+                      </div>
+                    );
+                  })()}
+                  <div className="text-xs text-muted-foreground border-t pt-3">
+                    {students.length} total students
+                  </div>
+                </div>
               </div>
             )}
+
+            {/* Student list — full-width on mobile, right col on desktop */}
+            <div className="rounded-2xl border bg-card shadow-sm overflow-hidden">
+              {students && students.length > 0 ? (
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="border-b bg-muted/60 text-[11px] text-muted-foreground font-semibold uppercase tracking-wide">
+                      <th className="px-4 py-3 text-left w-28">Roll No</th>
+                      <th className="px-4 py-3 text-left">Name</th>
+                      <th className="px-4 py-3 text-right">Status</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y">
+                    {students.map((s) => {
+                      const status = dayEdits.get(s.id) ?? "present";
+                      const isPresent = status === "present";
+                      return (
+                        <tr
+                          key={s.id}
+                          className={`transition-colors hover:bg-muted/30 ${!isPresent ? "bg-destructive/[0.04]" : ""}`}
+                        >
+                          <td className="px-4 py-3 font-mono text-xs text-muted-foreground">{s.roll_no}</td>
+                          <td className="px-4 py-3 font-medium">{s.name}</td>
+                          <td className="px-3 py-2.5 text-right">
+                            <button
+                              onClick={() => toggleDayStudent(s.id)}
+                              className={`inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all btn-press ${
+                                isPresent
+                                  ? "bg-success/15 text-success border border-success/30 hover:bg-success/25"
+                                  : "bg-destructive/15 text-destructive border border-destructive/30 hover:bg-destructive/25"
+                              }`}
+                            >
+                              {isPresent ? (
+                                <><CheckCircle2 className="h-3.5 w-3.5" /> Present</>
+                              ) : (
+                                <><XCircle className="h-3.5 w-3.5" /> Absent</>
+                              )}
+                            </button>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              ) : (
+                <div className="text-center py-12 text-sm text-muted-foreground">
+                  No students found in this class.
+                </div>
+              )}
+            </div>
           </div>
         </div>
       )}
@@ -661,63 +721,98 @@ function RegisterEntriesPage() {
       {/* ============================================================ */}
       {view === "month" && mode === "standard" && (
         <div className="space-y-4">
-          <div className="rounded-2xl border bg-card p-5 shadow-sm space-y-4">
-            <h2 className="text-xl display flex items-center justify-between">
-              <span>Monthly Overview ({format(monthStart, "MMMM yyyy")})</span>
-              <span className="text-xs font-normal text-muted-foreground">
-                {students?.length ?? 0} Students
+          <div className="rounded-2xl border bg-card shadow-sm overflow-hidden">
+            {/* Card header */}
+            <div className="px-5 py-4 border-b flex items-center justify-between">
+              <h2 className="text-xl display flex items-center gap-2">
+                Monthly Overview
+                <span className="text-muted-foreground text-base font-normal">
+                  ({format(monthStart, "MMMM yyyy")})
+                </span>
+              </h2>
+              <span className="text-xs text-muted-foreground bg-muted px-2.5 py-1 rounded-full font-medium">
+                {students?.length ?? 0} students
               </span>
-            </h2>
+            </div>
 
-            {/* Student List with Month % */}
-            <div className="divide-y text-sm">
-              {students?.map((student) => {
-                let present = 0;
-                let totalWorking = 0;
-                daysInMonth.forEach((d) => {
-                  if (d.isSunday || d.isHoliday) return;
-                  totalWorking++;
-                  const st = currentMatrixMap.get(`${student.id}|${d.date}`);
-                  if (st === "present") present++;
-                });
+            {/* Responsive table */}
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b bg-muted/40 text-[11px] text-muted-foreground font-semibold uppercase tracking-wide">
+                    <th className="px-4 py-3 text-left w-28">Roll No</th>
+                    <th className="px-4 py-3 text-left">Name</th>
+                    <th className="px-4 py-3 text-center hidden sm:table-cell">Present</th>
+                    <th className="px-4 py-3 text-center hidden sm:table-cell">Absent</th>
+                    <th className="px-4 py-3 text-center hidden md:table-cell">Working Days</th>
+                    <th className="px-4 py-3 text-center">Attendance</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y">
+                  {students?.map((student) => {
+                    let present = 0;
+                    let absent = 0;
+                    let totalWorking = 0;
+                    daysInMonth.forEach((d) => {
+                      if (d.isSunday || d.isHoliday) return;
+                      totalWorking++;
+                      const st = currentMatrixMap.get(`${student.id}|${d.date}`);
+                      if (st === "present") present++;
+                      else if (st === "absent") absent++;
+                    });
+                    const pct = totalWorking > 0 ? Math.round((present / totalWorking) * 100) : 0;
+                    const isAtRisk = pct < 75 && totalWorking > 0;
 
-                const pct = totalWorking > 0 ? Math.round((present / totalWorking) * 100) : 0;
-
-                return (
-                  <div key={student.id} className="flex items-center justify-between py-3">
-                    <div className="flex items-center gap-3 min-w-0">
-                      <span className="font-mono text-xs text-muted-foreground w-16 truncate shrink-0">
-                        {student.roll_no}
-                      </span>
-                      <span className="font-medium truncate">{student.name}</span>
-                    </div>
-
-                    <div className="flex items-center gap-3 shrink-0">
-                      <div className="text-xs text-muted-foreground">
-                        <span className="font-semibold text-foreground">{present}</span> /{" "}
-                        {totalWorking} days
-                      </div>
-                      <div className="w-16 h-2 bg-muted rounded-full overflow-hidden">
-                        <div
-                          className="h-full rounded-full transition-all"
-                          style={{
-                            width: `${pct}%`,
-                            background:
-                              pct >= 75 ? "var(--color-success)" : "var(--color-destructive)",
-                          }}
-                        />
-                      </div>
-                      <span
-                        className={`text-xs font-bold w-10 text-right ${
-                          pct >= 75 ? "text-success" : "text-destructive"
-                        }`}
+                    return (
+                      <tr
+                        key={student.id}
+                        className={`transition-colors hover:bg-muted/30 ${isAtRisk ? "bg-destructive/[0.03]" : ""}`}
                       >
-                        {pct}%
-                      </span>
-                    </div>
-                  </div>
-                );
-              })}
+                        <td className="px-4 py-3.5 font-mono text-xs text-muted-foreground">{student.roll_no}</td>
+                        <td className="px-4 py-3.5 font-medium">
+                          <div className="flex items-center gap-2">
+                            {student.name}
+                            {isAtRisk && (
+                              <span className="hidden sm:inline-flex text-[10px] font-bold text-destructive bg-destructive/10 px-1.5 py-0.5 rounded-full leading-none">
+                                At Risk
+                              </span>
+                            )}
+                          </div>
+                        </td>
+                        <td className="px-4 py-3.5 text-center hidden sm:table-cell">
+                          <span className="font-semibold text-success">{present}</span>
+                        </td>
+                        <td className="px-4 py-3.5 text-center hidden sm:table-cell">
+                          <span className={`font-semibold ${absent > 0 ? "text-destructive" : "text-muted-foreground"}`}>
+                            {absent}
+                          </span>
+                        </td>
+                        <td className="px-4 py-3.5 text-center text-muted-foreground hidden md:table-cell">
+                          {totalWorking}
+                        </td>
+                        <td className="px-4 py-3.5">
+                          <div className="flex items-center gap-2.5 justify-end sm:justify-center">
+                            <div className="hidden sm:block w-20 h-1.5 bg-muted rounded-full overflow-hidden">
+                              <div
+                                className="h-full rounded-full transition-all"
+                                style={{
+                                  width: `${pct}%`,
+                                  background: pct >= 75 ? "var(--color-success)" : "var(--color-destructive)",
+                                }}
+                              />
+                            </div>
+                            <span
+                              className={`text-xs font-bold w-10 text-right ${pct >= 75 ? "text-success" : "text-destructive"}`}
+                            >
+                              {pct}%
+                            </span>
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
             </div>
           </div>
         </div>
@@ -728,87 +823,89 @@ function RegisterEntriesPage() {
       {/* ============================================================ */}
       {view === "month" && mode === "excel" && (
         <div className="space-y-4">
-          {/* Action Toolbar for Excel Grid */}
-          <div className="rounded-2xl border bg-card p-4 shadow-sm flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
-            <div className="flex items-center gap-2 text-xs">
-              <span className="font-semibold text-foreground flex items-center gap-1.5">
-                <FileSpreadsheet className="h-4 w-4 text-primary" />
-                Excel Interactive Editor
-              </span>
-              {unsavedCount > 0 ? (
-                <span className="px-2.5 py-0.5 rounded-full bg-accent/20 text-accent font-bold animate-pulse">
-                  {unsavedCount} unsaved cell edits
+          {/* Toolbar */}
+          <div className="rounded-2xl border bg-card p-4 shadow-sm">
+            <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
+              <div className="flex items-center gap-3">
+                <span className="font-semibold text-foreground flex items-center gap-1.5 text-sm">
+                  <FileSpreadsheet className="h-4 w-4 text-primary" />
+                  Excel Register
                 </span>
-              ) : (
-                <span className="px-2 py-0.5 rounded-full bg-muted text-muted-foreground">
-                  All saved
-                </span>
-              )}
-            </div>
-
-            <div className="flex items-center gap-2">
-              {/* Import CSV */}
-              <label className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl border bg-muted/60 text-xs font-medium hover:bg-muted cursor-pointer transition-colors btn-press">
-                <Upload className="h-3.5 w-3.5 text-primary" />
-                Import CSV
-                <input type="file" accept=".csv" onChange={handleFileUpload} className="hidden" />
-              </label>
-
-              {/* Save Batch Changes */}
-              <button
-                onClick={() => saveMonthMutation.mutate()}
-                disabled={unsavedCount === 0 || saveMonthMutation.isPending}
-                className={`flex items-center gap-1.5 px-4 py-1.5 rounded-xl text-xs font-semibold shadow-sm transition-all btn-press ${
-                  unsavedCount > 0
-                    ? "gradient-primary text-primary-foreground"
-                    : "bg-muted text-muted-foreground cursor-not-allowed"
-                }`}
-              >
-                <Save className="h-3.5 w-3.5" />
-                {saveMonthMutation.isPending ? "Saving..." : "Save Grid Changes"}
-              </button>
+                {unsavedCount > 0 ? (
+                  <span className="px-2.5 py-0.5 rounded-full bg-accent/20 text-accent text-xs font-bold animate-pulse">
+                    {unsavedCount} unsaved edits
+                  </span>
+                ) : (
+                  <span className="px-2.5 py-0.5 rounded-full bg-success/15 text-success text-[11px] font-medium">
+                    ✓ All saved
+                  </span>
+                )}
+              </div>
+              <div className="flex items-center gap-2">
+                <label className="flex items-center gap-1.5 px-3 py-2 rounded-xl border bg-muted/60 text-xs font-medium hover:bg-muted cursor-pointer transition-colors btn-press">
+                  <Upload className="h-3.5 w-3.5 text-primary" />
+                  Import CSV
+                  <input type="file" accept=".csv" onChange={handleFileUpload} className="hidden" />
+                </label>
+                <button
+                  onClick={() => saveMonthMutation.mutate()}
+                  disabled={unsavedCount === 0 || saveMonthMutation.isPending}
+                  className={`flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-semibold shadow-sm transition-all btn-press ${
+                    unsavedCount > 0
+                      ? "gradient-primary text-primary-foreground"
+                      : "bg-muted text-muted-foreground cursor-not-allowed"
+                  }`}
+                >
+                  <Save className="h-3.5 w-3.5" />
+                  {saveMonthMutation.isPending ? "Saving..." : "Save Changes"}
+                </button>
+              </div>
             </div>
           </div>
 
-          {/* Full Spreadsheet Matrix Container */}
+          {/* Spreadsheet matrix */}
           <div className="rounded-2xl border bg-card shadow-sm overflow-hidden">
-            <div className="overflow-x-auto max-w-full">
+            <div className="overflow-x-auto">
               <table className="w-full text-xs border-collapse">
-                {/* Table Header (Sticky Roll No & Name, Days 1..N) */}
                 <thead>
                   <tr className="bg-muted/80 border-b text-muted-foreground font-semibold">
-                    <th className="sticky left-0 z-10 bg-muted/95 p-3 text-left w-24 border-r">
+                    {/* Sticky: Roll No */}
+                    <th className="sticky left-0 z-20 bg-muted/95 px-3 py-3 text-left w-28 border-r text-[11px] uppercase tracking-wide whitespace-nowrap">
                       Roll No
                     </th>
-                    <th className="sticky left-24 z-10 bg-muted/95 p-3 text-left w-40 border-r shadow-sm">
-                      Name
+                    {/* Sticky: Name */}
+                    <th className="sticky left-28 z-20 bg-muted/95 px-4 py-3 text-left w-52 border-r text-[11px] uppercase tracking-wide whitespace-nowrap shadow-[2px_0_8px_-2px_rgba(0,0,0,0.12)]">
+                      Student Name
                     </th>
+                    {/* Day columns */}
                     {daysInMonth.map((d) => (
                       <th
                         key={d.date}
-                        className={`p-2 text-center min-w-[42px] border-r ${
+                        className={`p-2 text-center min-w-[52px] border-r align-top ${
                           d.isSunday
-                            ? "bg-muted/40 text-muted-foreground/60"
+                            ? "bg-muted/50 text-muted-foreground/50"
                             : d.isHoliday
-                              ? "bg-accent/10 text-accent font-bold"
+                              ? "bg-accent/10 text-accent"
                               : ""
                         }`}
                       >
-                        <div className="text-[10px] uppercase">{d.label.split(" ")[0]}</div>
-                        <div className="text-xs font-bold">{d.dayNum}</div>
+                        <div className="text-[9px] uppercase tracking-wide font-medium opacity-70">
+                          {d.label.split(" ")[0]}
+                        </div>
+                        <div className="text-sm font-bold leading-tight mt-0.5">{d.dayNum}</div>
                         {!d.isSunday && !d.isHoliday && (
-                          <div className="flex justify-center gap-0.5 mt-1">
+                          <div className="flex justify-center gap-0.5 mt-1.5">
                             <button
                               onClick={() => setColumnStatus(d.date, "present")}
-                              title="Mark column Present"
-                              className="text-[9px] px-1 rounded bg-success/20 text-success hover:bg-success/40"
+                              title="Mark all Present"
+                              className="text-[9px] w-5 h-4 rounded bg-success/20 text-success hover:bg-success/40 font-bold transition-colors"
                             >
                               P
                             </button>
                             <button
                               onClick={() => setColumnStatus(d.date, "absent")}
-                              title="Mark column Absent"
-                              className="text-[9px] px-1 rounded bg-destructive/20 text-destructive hover:bg-destructive/40"
+                              title="Mark all Absent"
+                              className="text-[9px] w-5 h-4 rounded bg-destructive/20 text-destructive hover:bg-destructive/40 font-bold transition-colors"
                             >
                               A
                             </button>
@@ -816,100 +913,176 @@ function RegisterEntriesPage() {
                         )}
                       </th>
                     ))}
+                    {/* Sticky right: student summary */}
+                    <th className="sticky right-0 z-20 bg-muted/95 px-3 py-3 text-center min-w-[72px] border-l text-[11px] uppercase tracking-wide whitespace-nowrap shadow-[-2px_0_8px_-2px_rgba(0,0,0,0.12)]">
+                      Total %
+                    </th>
                   </tr>
                 </thead>
 
-                {/* Table Body (Students x Days matrix) */}
                 <tbody className="divide-y">
-                  {students?.map((student) => (
-                    <tr key={student.id} className="hover:bg-muted/30 transition-colors">
-                      <td className="sticky left-0 z-10 bg-card p-2.5 font-mono text-muted-foreground border-r font-medium">
-                        {student.roll_no}
+                  {students?.map((student) => {
+                    let studentPresent = 0;
+                    let studentAbsent = 0;
+                    let studentWorkingDays = 0;
+                    daysInMonth.forEach((d) => {
+                      if (d.isSunday || d.isHoliday) return;
+                      studentWorkingDays++;
+                      const st = currentMatrixMap.get(`${student.id}|${d.date}`) ?? "unmarked";
+                      if (st === "present") studentPresent++;
+                      else if (st === "absent") studentAbsent++;
+                    });
+                    const studentPct =
+                      studentWorkingDays > 0
+                        ? Math.round((studentPresent / studentWorkingDays) * 100)
+                        : 0;
+                    const isAtRisk = studentPct < 75 && studentWorkingDays > 0;
+
+                    return (
+                      <tr
+                        key={student.id}
+                        className={`transition-colors hover:bg-muted/20 ${isAtRisk ? "bg-destructive/[0.03]" : ""}`}
+                      >
+                        {/* Sticky: Roll No */}
+                        <td className="sticky left-0 z-10 bg-card px-3 py-2.5 font-mono text-[11px] text-muted-foreground border-r font-medium whitespace-nowrap">
+                          {student.roll_no}
+                        </td>
+                        {/* Sticky: Name */}
+                        <td className="sticky left-28 z-10 bg-card px-4 py-2.5 font-medium border-r max-w-[208px] truncate shadow-[2px_0_8px_-2px_rgba(0,0,0,0.12)] whitespace-nowrap">
+                          {student.name}
+                        </td>
+                        {/* Day cells */}
+                        {daysInMonth.map((d) => {
+                          const cellKey = `${student.id}|${d.date}`;
+                          const status = currentMatrixMap.get(cellKey) ?? "unmarked";
+                          const isEdited = gridEdits.has(cellKey);
+
+                          return (
+                            <td
+                              key={d.date}
+                              onClick={() => toggleCell(student.id, d.date, status)}
+                              className={`p-1.5 text-center border-r select-none transition-all ${
+                                d.isSunday
+                                  ? "bg-muted/20 cursor-not-allowed"
+                                  : d.isHoliday
+                                    ? "bg-accent/5 cursor-not-allowed"
+                                    : "cursor-pointer hover:bg-muted/40"
+                              } ${isEdited ? "ring-2 ring-primary ring-inset" : ""}`}
+                            >
+                              {d.isSunday ? (
+                                <span className="text-[10px] text-muted-foreground/40">S</span>
+                              ) : d.isHoliday ? (
+                                <span className="text-[10px] text-accent font-bold" title={d.holidayReason}>
+                                  H
+                                </span>
+                              ) : status === "present" ? (
+                                <span className="inline-flex items-center justify-center w-7 h-7 rounded-md bg-success text-success-foreground text-[11px] font-bold">
+                                  P
+                                </span>
+                              ) : status === "absent" ? (
+                                <span className="inline-flex items-center justify-center w-7 h-7 rounded-md bg-destructive text-destructive-foreground text-[11px] font-bold">
+                                  A
+                                </span>
+                              ) : (
+                                <span className="inline-flex items-center justify-center w-7 h-7 rounded-md bg-muted/60 text-muted-foreground/40 text-[11px]">
+                                  –
+                                </span>
+                              )}
+                            </td>
+                          );
+                        })}
+                        {/* Sticky right: per-student summary */}
+                        <td className="sticky right-0 z-10 bg-card border-l px-3 py-2.5 text-center shadow-[-2px_0_8px_-2px_rgba(0,0,0,0.12)]">
+                          <div className={`text-xs font-bold ${isAtRisk ? "text-destructive" : "text-success"}`}>
+                            {studentPct}%
+                          </div>
+                          <div className="text-[10px] text-muted-foreground leading-none mt-0.5">
+                            {studentPresent}/{studentWorkingDays}
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
+
+                  {/* Per-day totals summary row */}
+                  {students && students.length > 0 && (
+                    <tr className="bg-muted/60 border-t-2 border-muted-foreground/20">
+                      <td className="sticky left-0 z-10 bg-muted/80 px-3 py-2.5 text-[11px] font-semibold text-muted-foreground border-r whitespace-nowrap">
+                        Present/day
                       </td>
-                      <td className="sticky left-24 z-10 bg-card p-2.5 font-medium border-r truncate max-w-[160px] shadow-sm">
-                        {student.name}
+                      <td className="sticky left-28 z-10 bg-muted/80 px-4 py-2.5 text-[11px] text-muted-foreground border-r shadow-[2px_0_8px_-2px_rgba(0,0,0,0.12)] whitespace-nowrap">
+                        {students.length} students
                       </td>
                       {daysInMonth.map((d) => {
-                        const cellKey = `${student.id}|${d.date}`;
-                        const status = currentMatrixMap.get(cellKey) ?? "unmarked";
-                        const isEdited = gridEdits.has(cellKey);
-
+                        if (d.isSunday)
+                          return (
+                            <td key={d.date} className="p-1.5 text-center border-r bg-muted/30">
+                              <span className="text-[9px] text-muted-foreground/30">S</span>
+                            </td>
+                          );
+                        if (d.isHoliday)
+                          return (
+                            <td key={d.date} className="p-1.5 text-center border-r bg-accent/5">
+                              <span className="text-[9px] text-accent/50">H</span>
+                            </td>
+                          );
+                        const dayPresent = students.filter(
+                          (s) => (currentMatrixMap.get(`${s.id}|${d.date}`) ?? "unmarked") === "present",
+                        ).length;
+                        const dayPct = Math.round((dayPresent / students.length) * 100);
                         return (
-                          <td
-                            key={d.date}
-                            onClick={() => toggleCell(student.id, d.date, status)}
-                            className={`p-1.5 text-center border-r select-none cursor-pointer transition-all ${
-                              d.isSunday
-                                ? "bg-muted/30 cursor-not-allowed"
-                                : d.isHoliday
-                                  ? "bg-accent/5 cursor-not-allowed"
-                                  : "hover:scale-105"
-                            } ${isEdited ? "ring-2 ring-primary ring-inset" : ""}`}
-                          >
-                            {d.isSunday ? (
-                              <span className="text-[10px] text-muted-foreground/60 font-medium">
-                                S
-                              </span>
-                            ) : d.isHoliday ? (
-                              <span
-                                className="text-[10px] text-accent font-bold"
-                                title={d.holidayReason}
-                              >
-                                H
-                              </span>
-                            ) : status === "present" ? (
-                              <span className="inline-block w-6 h-6 rounded-md bg-success text-success-foreground text-[11px] font-bold leading-6 shadow-2xs">
-                                P
-                              </span>
-                            ) : status === "absent" ? (
-                              <span className="inline-block w-6 h-6 rounded-md bg-destructive text-destructive-foreground text-[11px] font-bold leading-6 shadow-2xs">
-                                A
-                              </span>
-                            ) : (
-                              <span className="inline-block w-6 h-6 rounded-md bg-muted text-muted-foreground/60 text-[11px] font-medium leading-6">
-                                -
-                              </span>
-                            )}
+                          <td key={d.date} className="p-1.5 text-center border-r">
+                            <div
+                              className={`text-[11px] font-bold ${
+                                dayPct >= 75
+                                  ? "text-success"
+                                  : dayPresent > 0
+                                    ? "text-destructive"
+                                    : "text-muted-foreground/30"
+                              }`}
+                            >
+                              {dayPresent > 0 ? dayPresent : "–"}
+                            </div>
                           </td>
                         );
                       })}
+                      <td className="sticky right-0 z-10 bg-muted/80 border-l px-3 py-2.5 text-center shadow-[-2px_0_8px_-2px_rgba(0,0,0,0.12)]">
+                        <div className="text-[10px] text-muted-foreground font-medium">/day</div>
+                      </td>
                     </tr>
-                  ))}
+                  )}
                 </tbody>
               </table>
             </div>
 
-            {/* Spreadsheet Footer Legend */}
-            <div className="p-3 bg-muted/40 border-t flex flex-wrap items-center justify-between text-xs gap-3">
-              <div className="flex items-center gap-4 text-muted-foreground">
-                <span className="flex items-center gap-1">
-                  <span className="w-3.5 h-3.5 rounded bg-success text-success-foreground text-[9px] font-bold flex items-center justify-center">
-                    P
-                  </span>{" "}
+            {/* Legend */}
+            <div className="px-4 py-3 bg-muted/30 border-t flex flex-wrap items-center justify-between gap-3">
+              <div className="flex items-center gap-4 text-xs text-muted-foreground flex-wrap">
+                <span className="flex items-center gap-1.5">
+                  <span className="w-5 h-5 rounded-md bg-success text-success-foreground text-[9px] font-bold flex items-center justify-center">P</span>
                   Present
                 </span>
-                <span className="flex items-center gap-1">
-                  <span className="w-3.5 h-3.5 rounded bg-destructive text-destructive-foreground text-[9px] font-bold flex items-center justify-center">
-                    A
-                  </span>{" "}
+                <span className="flex items-center gap-1.5">
+                  <span className="w-5 h-5 rounded-md bg-destructive text-destructive-foreground text-[9px] font-bold flex items-center justify-center">A</span>
                   Absent
                 </span>
-                <span className="flex items-center gap-1">
-                  <span className="w-3.5 h-3.5 rounded bg-accent/20 text-accent text-[9px] font-bold flex items-center justify-center">
-                    H
-                  </span>{" "}
+                <span className="flex items-center gap-1.5">
+                  <span className="w-5 h-5 rounded-md bg-accent/20 text-accent text-[9px] font-bold flex items-center justify-center">H</span>
                   Holiday
                 </span>
-                <span className="flex items-center gap-1">
-                  <span className="w-3.5 h-3.5 rounded bg-muted text-muted-foreground text-[9px] font-medium flex items-center justify-center">
-                    -
-                  </span>{" "}
+                <span className="flex items-center gap-1.5">
+                  <span className="w-5 h-5 rounded-md bg-muted/60 text-muted-foreground/50 text-[9px] flex items-center justify-center">–</span>
                   Unmarked
                 </span>
+                {unsavedCount > 0 && (
+                  <span className="flex items-center gap-1.5 text-primary font-medium">
+                    <span className="w-5 h-5 rounded-md ring-2 ring-primary bg-card text-[9px] flex items-center justify-center">✎</span>
+                    Unsaved edit
+                  </span>
+                )}
               </div>
-              <p className="text-[11px] text-muted-foreground">
-                💡 Tip: Click any cell to cycle status (Present ➔ Absent ➔ Unmarked). Use column
-                "P/A" buttons for bulk day marking.
+              <p className="text-[11px] text-muted-foreground hidden sm:block">
+                💡 Click a cell to cycle: Present → Absent → Unmarked · Use P/A buttons for bulk column edits
               </p>
             </div>
           </div>

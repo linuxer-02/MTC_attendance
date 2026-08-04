@@ -114,13 +114,44 @@ function MarkPage() {
     return true;
   };
 
+  // Toggling one student only writes that student's row, so concurrent
+  // taps (or a second device marking the same class) can't clobber other
+  // students' already-saved statuses by re-upserting a stale full roster.
+  const saveSingleStatus = async (studentId: string, status: "present" | "absent") => {
+    if (!classId) return false;
+    const { data: authData } = await supabase.auth.getUser();
+    const uid = authData.user?.id;
+    if (!uid) {
+      toast.error("Session expired. Please sign in again.");
+      return false;
+    }
+    const { error } = await supabase.from("attendance").upsert(
+      {
+        class_id: classId,
+        student_id: studentId,
+        date: today,
+        status,
+        marked_by: uid,
+      },
+      { onConflict: "student_id,date" },
+    );
+    if (error) {
+      toast.error(error.message);
+      return false;
+    }
+    refetch();
+    queryClient.invalidateQueries({ queryKey: ["att-week"] });
+    queryClient.invalidateQueries({ queryKey: ["att-month-register"] });
+    queryClient.invalidateQueries({ queryKey: ["att-today"] });
+    return true;
+  };
+
   const setStatus = async (studentId: string, next: "present" | "absent") => {
-    if (!classId || !students) return;
-    const nextState = { ...state, [studentId]: next };
-    setState(nextState);
-    const ok = await saveAllAttendance(nextState);
+    if (!classId) return;
+    setState((prev) => ({ ...prev, [studentId]: next }));
+    const ok = await saveSingleStatus(studentId, next);
     if (!ok) {
-      setState(state);
+      setState((prev) => ({ ...prev, [studentId]: next === "absent" ? "present" : "absent" }));
     }
   };
 

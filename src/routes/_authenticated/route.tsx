@@ -131,7 +131,7 @@ function AuthedShell() {
       </header>
 
       {/* ── Main content ── */}
-      <main className="flex-1 max-w-3xl w-full mx-auto px-4 pb-28 pt-5">
+      <main className={`flex-1 w-full mx-auto px-4 pb-28 pt-5 transition-all duration-300 ${pathname.startsWith('/app/entries') ? 'max-w-[1600px]' : 'max-w-3xl'}`}>
         {!hasAnyRole ? (
           <div className="rounded-2xl border bg-card p-8 text-center mt-8 animate-slide-up shadow-sm">
             <div className="text-5xl mb-4">⏳</div>
