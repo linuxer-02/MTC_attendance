@@ -5,14 +5,20 @@ import { toast } from "sonner";
 import Papa from "papaparse";
 import { useMyAccessibleClasses } from "@/features/shared/roles";
 import { Trash2, UserPlus, FileUp, Users, Plus } from "lucide-react";
+import { ClassSelect } from "@/components/shared/ClassSelect";
+import { RosterIdentity } from "@/components/shared/RosterIdentity";
+import { qk } from "@/features/shared/queryKeys";
+import { useStudentsInvalidator } from "@/features/shared/attendanceQueries";
 
 export function StudentsTab() {
   const qc = useQueryClient();
+  const invalidateStudents = useStudentsInvalidator();
   const { data: classes } = useMyAccessibleClasses();
   const [classId, setClassId] = useState("");
-  const { data: students, refetch } = useQuery({
+  
+  const { data: students } = useQuery({
     enabled: !!classId,
-    queryKey: ["students-admin", classId],
+    queryKey: qk.students(classId),
     queryFn: async () =>
       (await supabase.from("students").select("*").eq("class_id", classId).order("roll_no")).data ??
       [],
@@ -44,8 +50,7 @@ export function StudentsTab() {
 
     setRollNo("");
     setName("");
-    refetch();
-    qc.invalidateQueries({ queryKey: ["students", classId] });
+    invalidateStudents();
     toast.success("Student added");
   };
 
@@ -69,8 +74,7 @@ export function StudentsTab() {
     if (error) return toast.error(error.message);
     toast.success(`Uploaded ${rows.length} students`);
     setCsvText("");
-    refetch();
-    qc.invalidateQueries({ queryKey: ["students", classId] });
+    invalidateStudents();
   };
 
   const del = async (id: string) => {
@@ -78,24 +82,18 @@ export function StudentsTab() {
     const { error } = await supabase.from("students").delete().eq("id", id);
     if (error) return toast.error(error.message);
     toast.success("Removed student");
-    refetch();
-    qc.invalidateQueries({ queryKey: ["students", classId] });
+    invalidateStudents();
   };
 
   return (
     <div className="space-y-4">
-      <select
+      <ClassSelect
+        classes={classes}
         value={classId}
-        onChange={(e) => setClassId(e.target.value)}
-        className="w-full rounded-xl border bg-card px-3 py-2.5 text-sm shadow-sm"
-      >
-        <option value="">Select a class…</option>
-        {classes?.map((c) => (
-          <option key={c.id} value={c.id}>
-            {c.dept_name} · {c.year_label} · {c.name}
-          </option>
-        ))}
-      </select>
+        onChange={setClassId}
+        placeholder="Select a class…"
+        className="w-full"
+      />
 
       {classId && (
         <div className="animate-slide-up space-y-4">
@@ -180,12 +178,7 @@ export function StudentsTab() {
                   key={s.id}
                   className="flex items-center justify-between px-4 py-3 text-sm hover:bg-muted/30 transition-colors"
                 >
-                  <div className="flex items-center gap-3 min-w-0">
-                    <span className="font-mono text-xs text-muted-foreground min-w-[4.5rem] max-w-[7.5rem] truncate shrink-0">
-                      {s.roll_no}
-                    </span>
-                    <span className="font-medium truncate">{s.name}</span>
-                  </div>
+                  <RosterIdentity rollNo={s.roll_no} name={s.name} emphasis />
                   <button
                     onClick={() => del(s.id)}
                     className="p-1.5 rounded-lg text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors"

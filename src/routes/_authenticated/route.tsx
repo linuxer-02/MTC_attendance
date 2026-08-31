@@ -18,6 +18,8 @@ import {
   BarChart2,
   User,
   FileSpreadsheet,
+  Briefcase,
+  GraduationCap,
 } from "lucide-react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState, useEffect } from "react";
@@ -59,10 +61,28 @@ function AuthedShell() {
     },
   });
 
-  const hasRole = (r: "principal" | "hod" | "incharge") =>
+  const hasRole = (r: "principal" | "hod" | "incharge" | "admin") =>
     myRoles?.some((x) => x.role === r) ?? false;
-  const isAdmin = hasRole("principal") || hasRole("hod");
+  const showAdminTab = hasRole("principal") || hasRole("hod") || hasRole("admin");
   const hasAnyRole = (myRoles?.length ?? 0) > 0;
+  // Only Principal/Admin have a Staff side at all — everyone else stays on
+  // the Student side with no chooser or switcher ever shown.
+  const canSeeStaffMode = hasRole("principal") || hasRole("admin");
+  const isStaffMode = pathname.startsWith("/app/staff");
+
+  const MODE_CHOSEN_KEY = "attendhub-mode-chosen";
+  const [showChooser, setShowChooser] = useState(false);
+  useEffect(() => {
+    if (!myRoles || !canSeeStaffMode || pathname !== "/app") return;
+    if (sessionStorage.getItem(MODE_CHOSEN_KEY)) return;
+    setShowChooser(true);
+  }, [myRoles, canSeeStaffMode, pathname]);
+
+  const chooseMode = (mode: "student" | "staff") => {
+    sessionStorage.setItem(MODE_CHOSEN_KEY, "1");
+    setShowChooser(false);
+    if (mode === "staff") navigate({ to: "/app/staff" });
+  };
 
   const signOut = async () => {
     await queryClient.cancelQueries();
@@ -71,16 +91,58 @@ function AuthedShell() {
     navigate({ to: "/auth", replace: true });
   };
 
-  const tabs = [
+  const studentTabs = [
     { to: "/app", label: "Home", icon: Home, exact: true },
     { to: "/app/mark", label: "Mark", icon: ClipboardCheck },
     { to: "/app/absentees", label: "Report", icon: ListChecks },
     { to: "/app/entries", label: "Register", icon: FileSpreadsheet },
-    ...(isAdmin ? [{ to: "/app/admin", label: "Admin", icon: Settings }] : []),
+    ...(showAdminTab ? [{ to: "/app/admin", label: "Admin", icon: Settings }] : []),
   ];
+  const staffTabs = [
+    { to: "/app/staff", label: "Staff", icon: Briefcase, exact: true },
+    { to: "/app/staff/report", label: "Report", icon: ListChecks },
+    { to: "/app/staff/register", label: "Register", icon: FileSpreadsheet },
+  ];
+  const tabs = isStaffMode ? staffTabs : studentTabs;
 
   return (
     <div className="min-h-screen flex flex-col bg-background gradient-bg">
+      {/* ── Student/Staff mode chooser (Principal/Admin, once per session) ── */}
+      {showChooser && (
+        <div className="fixed inset-0 z-50 bg-background/95 backdrop-blur-sm flex items-center justify-center p-4 animate-slide-up">
+          <div className="w-full max-w-sm space-y-4 text-center">
+            <h2 className="text-3xl display">What would you like to do?</h2>
+            <p className="text-sm text-muted-foreground">Pick which register to work in.</p>
+            <div className="grid gap-3 pt-2">
+              <button
+                onClick={() => chooseMode("student")}
+                className="flex items-center gap-3 rounded-2xl border bg-card p-4 text-left shadow-sm hover:border-primary transition-colors btn-press"
+              >
+                <span className="w-10 h-10 rounded-xl gradient-primary flex items-center justify-center text-primary-foreground shrink-0">
+                  <GraduationCap className="h-5 w-5" />
+                </span>
+                <span>
+                  <div className="font-semibold">Student Attendance</div>
+                  <div className="text-xs text-muted-foreground">Classes, mark, register</div>
+                </span>
+              </button>
+              <button
+                onClick={() => chooseMode("staff")}
+                className="flex items-center gap-3 rounded-2xl border bg-card p-4 text-left shadow-sm hover:border-primary transition-colors btn-press"
+              >
+                <span className="w-10 h-10 rounded-xl gradient-primary flex items-center justify-center text-primary-foreground shrink-0">
+                  <Briefcase className="h-5 w-5" />
+                </span>
+                <span>
+                  <div className="font-semibold">Staff Attendance</div>
+                  <div className="text-xs text-muted-foreground">Roster, mark, register</div>
+                </span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* ── Header ── */}
       <header className="sticky top-0 z-20 glass-strong border-b">
         <div className="max-w-3xl mx-auto px-4 h-14 flex items-center justify-between">
@@ -94,6 +156,20 @@ function AuthedShell() {
           </Link>
 
           <div className="flex items-center gap-1">
+            {canSeeStaffMode && (
+              <Link
+                to={isStaffMode ? "/app" : "/app/staff"}
+                className="p-2 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted/60 transition-all"
+                aria-label={isStaffMode ? "Switch to Student side" : "Switch to Staff side"}
+                title={isStaffMode ? "Switch to Student side" : "Switch to Staff side"}
+              >
+                {isStaffMode ? (
+                  <GraduationCap className="h-4 w-4" />
+                ) : (
+                  <Briefcase className="h-4 w-4" />
+                )}
+              </Link>
+            )}
             <Link
               to="/app/analytics"
               className="p-2 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted/60 transition-all"

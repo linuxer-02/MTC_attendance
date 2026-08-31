@@ -20,6 +20,9 @@ import { Route as AuthenticatedAppEntriesRouteImport } from './routes/_authentic
 import { Route as AuthenticatedAppHolidayRouteImport } from './routes/_authenticated/app/holiday'
 import { Route as AuthenticatedAppMarkRouteImport } from './routes/_authenticated/app/mark'
 import { Route as AuthenticatedAppProfileRouteImport } from './routes/_authenticated/app/profile'
+import { Route as AuthenticatedAppStaffIndexRouteImport } from './routes/_authenticated/app/staff/index'
+import { Route as AuthenticatedAppStaffRegisterRouteImport } from './routes/_authenticated/app/staff/register'
+import { Route as AuthenticatedAppStaffReportRouteImport } from './routes/_authenticated/app/staff/report'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
@@ -77,6 +80,24 @@ const AuthenticatedAppProfileRoute = AuthenticatedAppProfileRouteImport.update({
   path: '/app/profile',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
+const AuthenticatedAppStaffIndexRoute =
+  AuthenticatedAppStaffIndexRouteImport.update({
+    id: '/app/staff/',
+    path: '/app/staff/',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
+const AuthenticatedAppStaffRegisterRoute =
+  AuthenticatedAppStaffRegisterRouteImport.update({
+    id: '/app/staff/register',
+    path: '/app/staff/register',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
+const AuthenticatedAppStaffReportRoute =
+  AuthenticatedAppStaffReportRouteImport.update({
+    id: '/app/staff/report',
+    path: '/app/staff/report',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -89,6 +110,9 @@ export interface FileRoutesByFullPath {
   '/app/mark': typeof AuthenticatedAppMarkRoute
   '/app/profile': typeof AuthenticatedAppProfileRoute
   '/app/': typeof AuthenticatedAppIndexRoute
+  '/app/staff/register': typeof AuthenticatedAppStaffRegisterRoute
+  '/app/staff/report': typeof AuthenticatedAppStaffReportRoute
+  '/app/staff/': typeof AuthenticatedAppStaffIndexRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -101,6 +125,9 @@ export interface FileRoutesByTo {
   '/app/mark': typeof AuthenticatedAppMarkRoute
   '/app/profile': typeof AuthenticatedAppProfileRoute
   '/app': typeof AuthenticatedAppIndexRoute
+  '/app/staff/register': typeof AuthenticatedAppStaffRegisterRoute
+  '/app/staff/report': typeof AuthenticatedAppStaffReportRoute
+  '/app/staff': typeof AuthenticatedAppStaffIndexRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -115,6 +142,9 @@ export interface FileRoutesById {
   '/_authenticated/app/mark': typeof AuthenticatedAppMarkRoute
   '/_authenticated/app/profile': typeof AuthenticatedAppProfileRoute
   '/_authenticated/app/': typeof AuthenticatedAppIndexRoute
+  '/_authenticated/app/staff/register': typeof AuthenticatedAppStaffRegisterRoute
+  '/_authenticated/app/staff/report': typeof AuthenticatedAppStaffReportRoute
+  '/_authenticated/app/staff/': typeof AuthenticatedAppStaffIndexRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -129,6 +159,9 @@ export interface FileRouteTypes {
     | '/app/mark'
     | '/app/profile'
     | '/app/'
+    | '/app/staff/register'
+    | '/app/staff/report'
+    | '/app/staff/'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -141,6 +174,9 @@ export interface FileRouteTypes {
     | '/app/mark'
     | '/app/profile'
     | '/app'
+    | '/app/staff/register'
+    | '/app/staff/report'
+    | '/app/staff'
   id:
     | '__root__'
     | '/'
@@ -154,6 +190,9 @@ export interface FileRouteTypes {
     | '/_authenticated/app/mark'
     | '/_authenticated/app/profile'
     | '/_authenticated/app/'
+    | '/_authenticated/app/staff/register'
+    | '/_authenticated/app/staff/report'
+    | '/_authenticated/app/staff/'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -241,6 +280,27 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedAppProfileRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/_authenticated/app/staff/': {
+      id: '/_authenticated/app/staff/'
+      path: '/app/staff'
+      fullPath: '/app/staff/'
+      preLoaderRoute: typeof AuthenticatedAppStaffIndexRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/app/staff/register': {
+      id: '/_authenticated/app/staff/register'
+      path: '/app/staff/register'
+      fullPath: '/app/staff/register'
+      preLoaderRoute: typeof AuthenticatedAppStaffRegisterRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/app/staff/report': {
+      id: '/_authenticated/app/staff/report'
+      path: '/app/staff/report'
+      fullPath: '/app/staff/report'
+      preLoaderRoute: typeof AuthenticatedAppStaffReportRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
   }
 }
 
@@ -253,6 +313,9 @@ interface AuthenticatedRouteRouteChildren {
   AuthenticatedAppMarkRoute: typeof AuthenticatedAppMarkRoute
   AuthenticatedAppProfileRoute: typeof AuthenticatedAppProfileRoute
   AuthenticatedAppIndexRoute: typeof AuthenticatedAppIndexRoute
+  AuthenticatedAppStaffRegisterRoute: typeof AuthenticatedAppStaffRegisterRoute
+  AuthenticatedAppStaffReportRoute: typeof AuthenticatedAppStaffReportRoute
+  AuthenticatedAppStaffIndexRoute: typeof AuthenticatedAppStaffIndexRoute
 }
 
 const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
@@ -264,6 +327,9 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedAppMarkRoute: AuthenticatedAppMarkRoute,
   AuthenticatedAppProfileRoute: AuthenticatedAppProfileRoute,
   AuthenticatedAppIndexRoute: AuthenticatedAppIndexRoute,
+  AuthenticatedAppStaffRegisterRoute: AuthenticatedAppStaffRegisterRoute,
+  AuthenticatedAppStaffReportRoute: AuthenticatedAppStaffReportRoute,
+  AuthenticatedAppStaffIndexRoute: AuthenticatedAppStaffIndexRoute,
 }
 
 const AuthenticatedRouteRouteWithChildren =

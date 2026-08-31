@@ -1,9 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
-import { supabase } from "@/integrations/supabase/client";
 import { useMyAccessibleClasses } from "@/features/shared/roles";
-import { useQuery } from "@tanstack/react-query";
-import { format, startOfMonth, endOfMonth, eachDayOfInterval, isSunday, parseISO } from "date-fns";
+import { format, startOfMonth, endOfMonth, parseISO } from "date-fns";
 import {
   BarChart,
   Bar,
@@ -14,7 +12,33 @@ import {
   ResponsiveContainer,
   Cell,
 } from "recharts";
-import { TrendingDown, TrendingUp, AlertTriangle, Trophy, CalendarDays } from "lucide-react";
+import {
+  TrendingDown,
+  TrendingUp,
+  AlertTriangle,
+  Trophy,
+  CalendarDays,
+  GraduationCap,
+} from "lucide-react";
+import { todayISO } from "@/features/shared/date";
+import {
+  ELIGIBILITY_META,
+  MIN_ATTENDANCE_PCT,
+  attendancePct,
+  defaultAcademicYearStart,
+  eligibilityOf,
+  pctBarColor,
+  pctToneClass,
+  workingDaysBetween,
+} from "@/features/shared/attendance";
+import {
+  useClassAttendance,
+  useClassHolidays,
+  useClassStudents,
+} from "@/features/shared/attendanceQueries";
+import { ClassSelect } from "@/components/shared/ClassSelect";
+import { StatTiles } from "@/components/shared/StatTiles";
+import { RosterIdentity } from "@/components/shared/RosterIdentity";
 
 export const Route = createFileRoute("/_authenticated/app/analytics")({
   head: () => ({ meta: [{ title: "Analytics — Smart Attend Hub" }] }),
@@ -25,6 +49,8 @@ function AnalyticsPage() {
   const { data: classes } = useMyAccessibleClasses();
   const [classId, setClassId] = useState<string | null>(null);
   const [month, setMonth] = useState(() => format(new Date(), "yyyy-MM"));
+  const [yearStart, setYearStart] = useState(defaultAcademicYearStart);
+  const today = todayISO();
 
   useEffect(() => {
     if (!classId && classes?.[0]) setClassId(classes[0].id);
@@ -35,58 +61,46 @@ function AnalyticsPage() {
   const from = format(monthStart, "yyyy-MM-dd");
   const to = format(monthEnd, "yyyy-MM-dd");
 
-  const { data: students } = useQuery({
-    enabled: !!classId,
-    queryKey: ["students", classId],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("students")
-        .select("id, name, roll_no")
-        .eq("class_id", classId!)
-        .order("roll_no");
-      if (error) throw error;
-      return data ?? [];
-    },
+  const { data: students } = useClassStudents(classId);
+  const { data: attendance } = useClassAttendance(classId, from, to);
+  const { data: holidays } = useClassHolidays(classId, from, to);
+
+  const workingDays = useMemo(() => workingDaysBetween(from, to, holidays), [from, to, holidays]);
+
+  // ── Cumulative academic-year attendance + Anna University R-2025 exam
+  // eligibility — independent of the month picker above, spans yearStart..today.
+  const yearStartValid = yearStart <= today;
+  const { data: yearAttendance } = useClassAttendance(classId, yearStart, today, {
+    enabled: yearStartValid,
+  });
+  const { data: yearHolidays } = useClassHolidays(classId, yearStart, today, {
+    enabled: yearStartValid,
   });
 
-  const { data: attendance } = useQuery({
-    enabled: !!classId,
-    queryKey: ["att-month", classId, from, to],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("attendance")
-        .select("student_id, date, status")
-        .eq("class_id", classId!)
-        .gte("date", from)
-        .lte("date", to);
-      if (error) throw error;
-      return data ?? [];
-    },
-  });
+  const yearWorkingDays = useMemo(
+    () => (yearStartValid ? workingDaysBetween(yearStart, today, yearHolidays) : []),
+    [yearStart, today, yearStartValid, yearHolidays],
+  );
 
-  const { data: holidays } = useQuery({
-    enabled: !!classId,
-    queryKey: ["holi-month", classId, from, to],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("class_holidays")
-        .select("date")
-        .eq("class_id", classId!)
-        .gte("date", from)
-        .lte("date", to);
-      if (error) throw error;
-      return new Set((data ?? []).map((h) => h.date));
-    },
-  });
+  const eligibilityStats = useMemo(() => {
+    const total = yearWorkingDays.length;
+    return (students ?? []).map((s) => {
+      const presentDays = (yearAttendance ?? []).filter(
+        (a) => a.student_id === s.id && a.status === "present",
+      ).length;
+      const pct = attendancePct(presentDays, total);
+      return { ...s, presentDays, total, pct, status: eligibilityOf(pct) };
+    });
+  }, [students, yearAttendance, yearWorkingDays]);
 
-  // Working days in month (no Sundays, no holidays)
-  const workingDays = useMemo(() => {
-    const days = eachDayOfInterval({ start: monthStart, end: monthEnd });
-    return days
-      .filter((d) => !isSunday(d))
-      .map((d) => format(d, "yyyy-MM-dd"))
-      .filter((d) => !holidays?.has(d));
-  }, [monthStart, monthEnd, holidays]);
+  const eligibilityCounts = useMemo(
+    () => ({
+      eligible: eligibilityStats.filter((s) => s.status === "eligible").length,
+      condonation: eligibilityStats.filter((s) => s.status === "condonation").length,
+      ineligible: eligibilityStats.filter((s) => s.status === "ineligible").length,
+    }),
+    [eligibilityStats],
+  );
 
   // Daily attendance chart data
   const dailyData = useMemo(() => {
@@ -97,7 +111,7 @@ function AnalyticsPage() {
         (a) => a.date === date && a.status === "present",
       ).length;
       const markedCount = (attendance ?? []).filter((a) => a.date === date).length;
-      const pct = markedCount > 0 ? Math.round((presentCount / total) * 100) : null;
+      const pct = markedCount > 0 ? attendancePct(presentCount, total) : null;
       return {
         date,
         label: format(parseISO(date), "d"),
@@ -116,13 +130,11 @@ function AnalyticsPage() {
       const presentDays = (attendance ?? []).filter(
         (a) => a.student_id === s.id && a.status === "present",
       ).length;
-      const markedDays = (attendance ?? []).filter((a) => a.student_id === s.id).length;
-      const pct = total > 0 ? Math.round((presentDays / total) * 100) : 0;
-      return { ...s, presentDays, markedDays, total, pct };
+      return { ...s, presentDays, total, pct: attendancePct(presentDays, total) };
     });
   }, [students, attendance, workingDays]);
 
-  const atRisk = studentStats.filter((s) => s.pct < 75 && s.total > 0);
+  const atRisk = studentStats.filter((s) => s.pct < MIN_ATTENDANCE_PCT && s.total > 0);
   const excellent = studentStats.filter((s) => s.pct >= 95 && s.total > 0);
 
   const avgPct = useMemo(() => {
@@ -161,17 +173,7 @@ function AnalyticsPage() {
 
       {/* Controls */}
       <div className="grid grid-cols-2 gap-2">
-        <select
-          value={classId ?? ""}
-          onChange={(e) => setClassId(e.target.value)}
-          className="rounded-xl border bg-card px-3 py-2.5 text-sm shadow-sm"
-        >
-          {classes?.map((c) => (
-            <option key={c.id} value={c.id}>
-              {c.dept_name} · {c.year_label} · {c.name}
-            </option>
-          ))}
-        </select>
+        <ClassSelect classes={classes} value={classId} onChange={setClassId} />
         <input
           type="month"
           value={month}
@@ -180,40 +182,111 @@ function AnalyticsPage() {
         />
       </div>
 
+      {/* Academic-year cumulative attendance & exam eligibility (Anna University R-2025) */}
+      <div className="rounded-2xl border bg-card p-4 shadow-sm space-y-4">
+        <div className="flex items-center justify-between gap-2 flex-wrap">
+          <h2 className="text-xl display flex items-center gap-2">
+            <GraduationCap className="h-5 w-5 text-primary" />
+            Exam Eligibility · Anna University R-2025
+          </h2>
+          <div className="flex items-center gap-1.5 text-xs">
+            <label className="text-muted-foreground uppercase tracking-wide font-medium">
+              Academic year from
+            </label>
+            <input
+              type="date"
+              value={yearStart}
+              max={today}
+              onChange={(e) => setYearStart(e.target.value)}
+              className="rounded-lg border bg-background px-2 py-1.5 text-xs font-medium"
+            />
+          </div>
+        </div>
+        <p className="text-[11px] text-muted-foreground leading-relaxed">
+          Cumulative attendance from the academic year start date through today (
+          {format(parseISO(today), "MMM d, yyyy")}). Per the regulation:{" "}
+          <b className="text-success">≥75%</b> is eligible for the university exam,{" "}
+          <b className="text-accent">65–74%</b> requires condonation by the Head of Institution, and{" "}
+          <b className="text-destructive">&lt;65%</b> is not eligible.
+        </p>
+
+        {!yearStartValid ? (
+          <div className="rounded-xl border bg-muted/40 p-4 text-center text-xs text-muted-foreground">
+            Academic year start must be on or before today.
+          </div>
+        ) : (
+          <>
+            {/* Eligibility summary */}
+            <StatTiles
+              tiles={(["eligible", "condonation", "ineligible"] as const).map((key) => ({
+                label: ELIGIBILITY_META[key].label,
+                value: eligibilityCounts[key],
+                tone: ELIGIBILITY_META[key].toneClass,
+                icon: ELIGIBILITY_META[key].icon,
+                tileClass: ELIGIBILITY_META[key].badgeClass,
+              }))}
+            />
+
+            {/* Per-student eligibility table */}
+            {eligibilityStats.length > 0 ? (
+              <ul className="divide-y text-sm">
+                {eligibilityStats
+                  .slice()
+                  .sort((a, b) => a.pct - b.pct)
+                  .map((s) => {
+                    const meta = ELIGIBILITY_META[s.status];
+                    return (
+                      <li key={s.id} className="flex items-center justify-between gap-3 py-2.5">
+                        <RosterIdentity rollNo={s.roll_no} name={s.name} />
+                        <div className="flex items-center gap-2 shrink-0">
+                          <span className="text-xs text-muted-foreground hidden sm:inline">
+                            {s.presentDays}/{s.total}
+                          </span>
+                          <span className={`font-bold text-xs w-10 text-right ${meta.toneClass}`}>
+                            {s.pct}%
+                          </span>
+                          <span
+                            className={`text-[10px] font-semibold rounded-full px-2 py-1 border whitespace-nowrap ${meta.badgeClass}`}
+                          >
+                            {meta.label}
+                          </span>
+                        </div>
+                      </li>
+                    );
+                  })}
+              </ul>
+            ) : (
+              <div className="rounded-xl border bg-muted/40 p-6 text-center text-xs text-muted-foreground">
+                No students in this class.
+              </div>
+            )}
+          </>
+        )}
+      </div>
+
       {/* Summary pills */}
-      <div className="grid grid-cols-3 gap-2 stagger-children">
-        {[
+      <StatTiles
+        tiles={[
           {
             label: "Avg Attendance",
             value: `${avgPct}%`,
-            color: avgPct >= 75 ? "text-success" : "text-destructive",
-            icon: avgPct >= 75 ? TrendingUp : TrendingDown,
+            tone: pctToneClass(avgPct),
+            icon: avgPct >= MIN_ATTENDANCE_PCT ? TrendingUp : TrendingDown,
           },
           {
             label: "Working Days",
             value: workingDays.length,
-            color: "text-primary",
+            tone: "text-primary",
             icon: CalendarDays,
           },
           {
             label: "Students",
             value: students?.length ?? 0,
-            color: "text-accent",
+            tone: "text-accent",
             icon: AlertTriangle,
           },
-        ].map((s) => (
-          <div
-            key={s.label}
-            className="rounded-2xl border bg-card p-3 text-center shadow-sm card-hover animate-slide-up"
-          >
-            <s.icon className={`h-5 w-5 mx-auto mb-1 ${s.color}`} />
-            <div className={`text-2xl display font-bold ${s.color}`}>{s.value}</div>
-            <div className="text-[10px] uppercase text-muted-foreground mt-0.5 tracking-wide leading-tight">
-              {s.label}
-            </div>
-          </div>
-        ))}
-      </div>
+        ]}
+      />
 
       {/* Daily attendance chart */}
       <div className="rounded-2xl border bg-card p-4 shadow-sm">
@@ -243,13 +316,7 @@ function AnalyticsPage() {
                 {dailyData.map((d, i) => (
                   <Cell
                     key={i}
-                    fill={
-                      d.pct === null
-                        ? "var(--color-border)"
-                        : (d.pct ?? 0) >= 75
-                          ? "var(--color-success)"
-                          : "var(--color-destructive)"
-                    }
+                    fill={d.pct === null ? "var(--color-border)" : pctBarColor(d.pct)}
                     opacity={d.pct === null ? 0.3 : 1}
                   />
                 ))}
@@ -275,15 +342,11 @@ function AnalyticsPage() {
           </h2>
           <ul className="divide-y divide-destructive/10">
             {atRisk
+              .slice()
               .sort((a, b) => a.pct - b.pct)
               .map((s) => (
                 <li key={s.id} className="flex items-center justify-between py-2.5 text-sm min-w-0">
-                  <div className="flex items-center gap-3 min-w-0">
-                    <span className="font-mono text-xs text-muted-foreground min-w-[4.5rem] max-w-[7.5rem] truncate shrink-0">
-                      {s.roll_no}
-                    </span>
-                    <span className="font-medium truncate">{s.name}</span>
-                  </div>
+                  <RosterIdentity rollNo={s.roll_no} name={s.name} emphasis />
                   <div className="flex items-center gap-2">
                     <div className="w-16 h-1.5 bg-muted rounded-full overflow-hidden">
                       <div
@@ -310,15 +373,11 @@ function AnalyticsPage() {
           </h2>
           <ul className="divide-y divide-success/10">
             {excellent
+              .slice()
               .sort((a, b) => b.pct - a.pct)
               .map((s) => (
                 <li key={s.id} className="flex items-center justify-between py-2.5 text-sm min-w-0">
-                  <div className="flex items-center gap-3 min-w-0">
-                    <span className="font-mono text-xs text-muted-foreground min-w-[4.5rem] max-w-[7.5rem] truncate shrink-0">
-                      {s.roll_no}
-                    </span>
-                    <span className="font-medium truncate">{s.name}</span>
-                  </div>
+                  <RosterIdentity rollNo={s.roll_no} name={s.name} emphasis />
                   <span className="text-success font-bold text-xs">{s.pct}%</span>
                 </li>
               ))}
@@ -332,31 +391,19 @@ function AnalyticsPage() {
           <h2 className="text-xl display mb-3">All Students</h2>
           <ul className="divide-y text-sm">
             {studentStats
+              .slice()
               .sort((a, b) => a.pct - b.pct)
               .map((s) => (
                 <li key={s.id} className="flex items-center justify-between py-2.5">
-                  <div className="flex items-center gap-3 min-w-0">
-                    <span className="font-mono text-xs text-muted-foreground min-w-[4.5rem] max-w-[7.5rem] truncate shrink-0">
-                      {s.roll_no}
-                    </span>
-                    <span className="truncate">{s.name}</span>
-                  </div>
+                  <RosterIdentity rollNo={s.roll_no} name={s.name} />
                   <div className="flex items-center gap-2 shrink-0">
                     <div className="w-12 h-1.5 bg-muted rounded-full overflow-hidden">
                       <div
                         className="h-full rounded-full transition-all"
-                        style={{
-                          width: `${s.pct}%`,
-                          background:
-                            s.pct >= 75 ? "var(--color-success)" : "var(--color-destructive)",
-                        }}
+                        style={{ width: `${s.pct}%`, background: pctBarColor(s.pct) }}
                       />
                     </div>
-                    <span
-                      className={`font-bold text-xs w-10 text-right ${
-                        s.pct >= 75 ? "text-success" : "text-destructive"
-                      }`}
-                    >
+                    <span className={`font-bold text-xs w-10 text-right ${pctToneClass(s.pct)}`}>
                       {s.pct}%
                     </span>
                   </div>

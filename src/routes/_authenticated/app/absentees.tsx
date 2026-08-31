@@ -5,8 +5,13 @@ import { supabase } from "@/integrations/supabase/client";
 import { useMyAccessibleClasses, useMyRoles } from "@/features/shared/roles";
 import { prettyDate, todayISO } from "@/features/shared/date";
 import { useQuery } from "@tanstack/react-query";
-import { toast } from "sonner";
-import { Copy, Share2, Users, Building2, CalendarDays, Globe } from "lucide-react";
+import { Users, Building2, CalendarDays, Globe } from "lucide-react";
+import { qk } from "@/features/shared/queryKeys";
+import { useCopyShare } from "@/features/shared/useCopyShare";
+import { ReportActions, RawTextDetails } from "@/components/shared/ReportActions";
+import { StatTiles } from "@/components/shared/StatTiles";
+import { RosterIdentity } from "@/components/shared/RosterIdentity";
+import { ClassSelect } from "@/components/shared/ClassSelect";
 
 const searchSchema = z.object({ classId: z.string().optional(), date: z.string().optional() });
 export const Route = createFileRoute("/_authenticated/app/absentees")({
@@ -63,7 +68,7 @@ function AbsenteesPage() {
 
   const { data: report } = useQuery({
     enabled: targetClassIds.length > 0,
-    queryKey: ["absentees", targetClassIds.join(","), date],
+    queryKey: qk.attendanceForClasses(targetClassIds, date),
     queryFn: async () => {
       const [studentsRes, attRes, classesRes, yearsRes, deptsRes] = await Promise.all([
         supabase
@@ -113,45 +118,34 @@ function AbsenteesPage() {
         byClass.get(key)!.students.push({ name: s.name, roll_no: s.roll_no });
       });
       byClass.forEach((g) => g.students.sort((a, b) => a.roll_no.localeCompare(b.roll_no)));
-      return Array.from(byClass.values());
+      return {
+        groups: Array.from(byClass.values()),
+        totalStudents: studentsRes.data?.length ?? 0,
+      };
     },
   });
 
-  const totalAbsent = report?.reduce((a, g) => a + g.students.length, 0) ?? 0;
+  const totalStudents = report?.totalStudents ?? 0;
+  const totalAbsent = report?.groups.reduce((a, g) => a + g.students.length, 0) ?? 0;
+  const totalPresent = totalStudents - totalAbsent;
 
   const text = useMemo(() => {
     if (!report) return "";
     const lines: string[] = [];
     lines.push(`📋 Absentees — ${prettyDate(date)}`);
+    lines.push(`Total: ${totalStudents} · Present: ${totalPresent} · Absent: ${totalAbsent}`);
     lines.push("");
-    report.forEach((g) => {
+    report.groups.forEach((g) => {
       lines.push(`${g.deptName} · ${g.yearLabel} · ${g.className} (${g.students.length} absent)`);
       g.students.forEach((s) => lines.push(`  ${s.roll_no}  ${s.name}`));
       lines.push("");
     });
-    if (report.length === 0) lines.push("No absentees today. 🎉");
+    if (report.groups.length === 0) lines.push("No absentees today. 🎉");
     else lines.push(`Total absent: ${totalAbsent}`);
     return lines.join("\n");
-  }, [report, date, totalAbsent]);
+  }, [report, date, totalStudents, totalPresent, totalAbsent]);
 
-  const copy = async () => {
-    try {
-      await navigator.clipboard.writeText(text);
-      toast.success("Copied to clipboard");
-    } catch {
-      toast.error("Copy failed");
-    }
-  };
-
-  const share = async () => {
-    if (!navigator.share) return copy();
-    try {
-      await navigator.share({ title: `Absentees — ${prettyDate(date)}`, text });
-      toast.success("Shared successfully");
-    } catch (err: any) {
-      if (err.name !== "AbortError") toast.error("Share failed");
-    }
-  };
+  const { copy, share } = useCopyShare(text, `Absentees — ${prettyDate(date)}`);
 
   const scopeOptions: { key: Scope; label: string; icon: React.ElementType; show: boolean }[] = [
     { key: "class", label: "Class", icon: Users, show: true },
@@ -211,17 +205,12 @@ function AbsenteesPage() {
 
         {/* Scoped selects */}
         {scope === "class" && (
-          <select
-            value={classId ?? ""}
-            onChange={(e) => setClassId(e.target.value)}
-            className="w-full rounded-xl border bg-background px-3 py-2.5 text-sm"
-          >
-            {classes?.map((c) => (
-              <option key={c.id} value={c.id}>
-                {c.dept_name} · {c.year_label} · {c.name}
-              </option>
-            ))}
-          </select>
+          <ClassSelect
+            classes={classes}
+            value={classId}
+            onChange={setClassId}
+            className="w-full bg-background shadow-none"
+          />
         )}
         {scope === "year" && (
           <select
@@ -262,28 +251,25 @@ function AbsenteesPage() {
               {totalAbsent} absent
             </span>
           </h2>
-          <div className="flex gap-2">
-            <button
-              onClick={copy}
-              className="flex items-center gap-1.5 text-sm rounded-xl border bg-card px-3 py-1.5 hover:bg-muted transition-colors btn-press"
-            >
-              <Copy className="h-3.5 w-3.5" />
-              Copy
-            </button>
-            <button
-              onClick={share}
-              className="flex items-center gap-1.5 text-sm rounded-xl gradient-primary text-primary-foreground px-3 py-1.5 shadow-sm btn-press"
-            >
-              <Share2 className="h-3.5 w-3.5" />
-              Share
-            </button>
-          </div>
+          <ReportActions onCopy={copy} onShare={share} />
         </div>
 
+        {/* Total / Present / Absent summary */}
+        {report && (
+          <StatTiles
+            className="mb-4"
+            tiles={[
+              { label: "Total", value: totalStudents, tone: "text-foreground" },
+              { label: "Present", value: totalPresent, tone: "text-success" },
+              { label: "Absent", value: totalAbsent, tone: "text-destructive" },
+            ]}
+          />
+        )}
+
         {/* Rendered report cards */}
-        {report && report.length > 0 ? (
+        {report && report.groups.length > 0 ? (
           <div className="space-y-3 stagger-children">
-            {report.map((g, i) => (
+            {report.groups.map((g, i) => (
               <div
                 key={i}
                 className="rounded-2xl border bg-card p-4 shadow-sm animate-slide-up card-hover"
@@ -300,18 +286,15 @@ function AbsenteesPage() {
                 </div>
                 <ul className="divide-y">
                   {g.students.map((s) => (
-                    <li key={s.roll_no} className="flex items-center gap-3 py-2 text-sm min-w-0">
-                      <span className="font-mono text-xs text-muted-foreground min-w-[4.5rem] max-w-[7.5rem] truncate shrink-0">
-                        {s.roll_no}
-                      </span>
-                      <span className="truncate">{s.name}</span>
+                    <li key={s.roll_no} className="py-2 text-sm">
+                      <RosterIdentity rollNo={s.roll_no} name={s.name} />
                     </li>
                   ))}
                 </ul>
               </div>
             ))}
           </div>
-        ) : report && report.length === 0 ? (
+        ) : report && report.groups.length === 0 ? (
           <div className="rounded-2xl border bg-card p-8 text-center animate-slide-up">
             <div className="text-5xl mb-3">🎉</div>
             <p className="text-sm text-muted-foreground">No absentees today!</p>
@@ -323,16 +306,7 @@ function AbsenteesPage() {
         )}
 
         {/* Raw text (collapsible) */}
-        {text && (
-          <details className="mt-3">
-            <summary className="text-xs text-muted-foreground cursor-pointer hover:text-foreground transition-colors">
-              View raw text (for copy)
-            </summary>
-            <pre className="mt-2 whitespace-pre-wrap text-xs rounded-xl border bg-card p-4 font-mono overflow-x-auto">
-              {text}
-            </pre>
-          </details>
-        )}
+        <RawTextDetails text={text} />
       </div>
     </div>
   );

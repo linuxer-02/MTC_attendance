@@ -38,7 +38,7 @@ const SUPABASE_URL = process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL;
 const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_KEY;
 const args = process.argv.slice(2).filter((a) => a !== "--dry-run");
 const CSV_PATH = path.resolve(process.cwd(), args[0] || "MTC DAILY ATTENDANCE(2YR JULY 2026).csv");
-const YEAR_LABEL = "2nd Year";
+const YEAR_LABEL = args[1] || "2nd Year";
 const DRY_RUN = process.argv.includes("--dry-run");
 
 const DATE_HEADER_RE = /^\d{1,2}-[A-Za-z]{3}-\d{2}$/;

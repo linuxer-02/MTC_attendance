@@ -7,6 +7,15 @@ import { prettyDate, todayISO } from "@/features/shared/date";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { format, startOfMonth, endOfMonth, eachDayOfInterval, isSunday, parseISO } from "date-fns";
 import { toast } from "sonner";
+import { ClassSelect } from "@/components/shared/ClassSelect";
+import { RosterIdentity } from "@/components/shared/RosterIdentity";
+import { qk } from "@/features/shared/queryKeys";
+import {
+  useClassStudents,
+  useAttendanceInvalidator,
+  currentUserId,
+} from "@/features/shared/attendanceQueries";
+import { attendancePct, pctToneClass, pctBarColor } from "@/features/shared/attendance";
 import {
   generateExcelCSV,
   downloadCSV,
@@ -50,9 +59,27 @@ export const Route = createFileRoute("/_authenticated/app/entries")({
 type ViewType = "day" | "month";
 type ModeType = "standard" | "excel";
 
+const MONTH_NAMES = [
+  "January",
+  "February",
+  "March",
+  "April",
+  "May",
+  "June",
+  "July",
+  "August",
+  "September",
+  "October",
+  "November",
+  "December",
+];
+// A few years back to a year ahead is plenty for editing past registers.
+const YEAR_OPTIONS = Array.from({ length: 6 }, (_, i) => new Date().getFullYear() - 4 + i);
+
 function RegisterEntriesPage() {
   const search = Route.useSearch();
   const queryClient = useQueryClient();
+  const invalidateAttendance = useAttendanceInvalidator();
 
   const { data: roles } = useMyRoles();
   const { data: classes, isLoading: isLoadingClasses } = useMyAccessibleClasses();
@@ -91,24 +118,12 @@ function RegisterEntriesPage() {
   // Database Queries
   // ----------------------------------------------------
   // 1. Students in class
-  const { data: students } = useQuery({
-    enabled: !!classId,
-    queryKey: ["students", classId],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("students")
-        .select("id, name, roll_no")
-        .eq("class_id", classId!)
-        .order("roll_no");
-      if (error) throw error;
-      return data ?? [];
-    },
-  });
+  const { data: students } = useClassStudents(classId);
 
   // 2. Month Attendance Query
   const { data: monthAttendance, isLoading: isLoadingMonthAtt } = useQuery({
     enabled: !!classId && view === "month",
-    queryKey: ["att-month-register", classId, monthFromStr, monthToStr],
+    queryKey: qk.attendance(classId, monthFromStr, monthToStr),
     queryFn: async () => {
       const { data, error } = await supabase
         .from("attendance")
@@ -124,7 +139,7 @@ function RegisterEntriesPage() {
   // 3. Month Holidays Query
   const { data: monthHolidays } = useQuery({
     enabled: !!classId && view === "month",
-    queryKey: ["holi-month-register", classId, monthFromStr, monthToStr],
+    queryKey: qk.holidays(classId, monthFromStr, monthToStr),
     queryFn: async () => {
       const { data, error } = await supabase
         .from("class_holidays")
@@ -140,7 +155,7 @@ function RegisterEntriesPage() {
   // 4. Day Attendance Query (for Day View)
   const { data: dayAttendance, isLoading: isLoadingDayAtt } = useQuery({
     enabled: !!classId && view === "day",
-    queryKey: ["att-day-register", classId, selectedDate],
+    queryKey: qk.attendance(classId, selectedDate, selectedDate),
     queryFn: async () => {
       const { data, error } = await supabase
         .from("attendance")
@@ -339,8 +354,7 @@ function RegisterEntriesPage() {
     onSuccess: () => {
       toast.success("Excel grid changes saved successfully!");
       setGridEdits(new Map());
-      queryClient.invalidateQueries({ queryKey: ["att-month-register"] });
-      queryClient.invalidateQueries({ queryKey: ["att-week"] });
+      invalidateAttendance();
     },
     onError: (err: Error) => {
       toast.error("Failed to save changes: " + err.message);
@@ -352,8 +366,7 @@ function RegisterEntriesPage() {
     mutationFn: async () => {
       if (!classId || !students || students.length === 0) return;
 
-      const { data: authData } = await supabase.auth.getUser();
-      const uid = authData.user?.id;
+      const uid = await currentUserId();
       if (!uid) throw new Error("Session expired. Please sign in again.");
 
       const payload = students.map((s) => ({
@@ -371,9 +384,7 @@ function RegisterEntriesPage() {
     },
     onSuccess: () => {
       toast.success(`Attendance for ${prettyDate(selectedDate)} saved!`);
-      queryClient.invalidateQueries({ queryKey: ["att-day-register"] });
-      queryClient.invalidateQueries({ queryKey: ["att-week"] });
-      queryClient.invalidateQueries({ queryKey: ["att-month-register"] });
+      invalidateAttendance();
     },
     onError: (err: Error) => {
       toast.error("Failed to save day attendance: " + err.message);
@@ -489,18 +500,13 @@ function RegisterEntriesPage() {
       {/* Main Controls Card */}
       <div className="rounded-2xl border bg-card p-4 space-y-4 shadow-sm">
         {/* Class Selection & Primary View Toggle (Day vs Month) */}
-        <div className="flex flex-col sm:flex-row gap-3 items-stretch sm:items-center justify-between">
-          <select
-            value={classId ?? ""}
-            onChange={(e) => setClassId(e.target.value)}
-            className="flex-1 rounded-xl border bg-background px-3.5 py-2.5 text-sm font-medium shadow-sm"
-          >
-            {classes?.map((c) => (
-              <option key={c.id} value={c.id}>
-                {c.dept_name} · {c.year_label} · {c.name}
-              </option>
-            ))}
-          </select>
+          <div className="flex flex-col sm:flex-row sm:items-center gap-3">
+          <ClassSelect
+            classes={classes}
+            value={classId}
+            onChange={setClassId}
+            className="flex-1"
+          />
 
           {/* Day vs Month View Switcher */}
           <div className="inline-flex w-full sm:w-auto rounded-xl bg-muted p-1 border gap-1">
@@ -536,12 +542,28 @@ function RegisterEntriesPage() {
               <label className="text-xs font-semibold uppercase text-muted-foreground tracking-wide">
                 Month:
               </label>
-              <input
-                type="month"
-                value={selectedMonth}
-                onChange={(e) => setSelectedMonth(e.target.value)}
+              <select
+                value={selectedMonth.slice(5, 7)}
+                onChange={(e) => setSelectedMonth(`${selectedMonth.slice(0, 4)}-${e.target.value}`)}
                 className="rounded-xl border bg-background px-3 py-1.5 text-sm font-medium"
-              />
+              >
+                {MONTH_NAMES.map((name, i) => (
+                  <option key={name} value={String(i + 1).padStart(2, "0")}>
+                    {name}
+                  </option>
+                ))}
+              </select>
+              <select
+                value={selectedMonth.slice(0, 4)}
+                onChange={(e) => setSelectedMonth(`${e.target.value}-${selectedMonth.slice(5, 7)}`)}
+                className="rounded-xl border bg-background px-3 py-1.5 text-sm font-medium"
+              >
+                {YEAR_OPTIONS.map((y) => (
+                  <option key={y} value={y}>
+                    {y}
+                  </option>
+                ))}
+              </select>
             </div>
 
             {/* Separate Option Toggle for Interactive Excel Editor (as requested by user) */}
@@ -625,15 +647,11 @@ function RegisterEntriesPage() {
               </div>
               <div className="rounded-xl bg-muted border p-2.5 text-center">
                 {(() => {
-                  const pct = Math.round(
-                    (students.filter((s) => (dayEdits.get(s.id) ?? "present") === "present")
-                      .length /
-                      students.length) *
-                      100,
-                  );
+                  const presentCount = students.filter((s) => (dayEdits.get(s.id) ?? "present") === "present").length;
+                  const pct = attendancePct(presentCount, students.length);
                   return (
                     <div
-                      className={`text-lg font-bold ${pct >= 75 ? "text-success" : "text-destructive"}`}
+                      className={`text-lg font-bold ${pctToneClass(pct)}`}
                     >
                       {pct}%
                     </div>
@@ -679,18 +697,14 @@ function RegisterEntriesPage() {
                     </div>
                   </div>
                   {(() => {
-                    const pct = Math.round(
-                      (students.filter((s) => (dayEdits.get(s.id) ?? "present") === "present")
-                        .length /
-                        students.length) *
-                        100,
-                    );
+                    const presentCount = students.filter((s) => (dayEdits.get(s.id) ?? "present") === "present").length;
+                    const pct = attendancePct(presentCount, students.length);
                     return (
                       <div>
                         <div className="flex items-center justify-between text-xs mb-1.5">
                           <span className="text-muted-foreground">Attendance rate</span>
                           <span
-                            className={`font-bold ${pct >= 75 ? "text-success" : "text-destructive"}`}
+                            className={`font-bold ${pctToneClass(pct)}`}
                           >
                             {pct}%
                           </span>
@@ -700,8 +714,7 @@ function RegisterEntriesPage() {
                             className="h-full rounded-full transition-all duration-500"
                             style={{
                               width: `${pct}%`,
-                              background:
-                                pct >= 75 ? "var(--color-success)" : "var(--color-destructive)",
+                              background: pctBarColor(pct),
                             }}
                           />
                         </div>
@@ -722,8 +735,7 @@ function RegisterEntriesPage() {
                   <table className="w-full text-sm">
                     <thead>
                       <tr className="border-b bg-muted/60 text-[11px] text-muted-foreground font-semibold uppercase tracking-wide">
-                        <th className="px-4 py-3 text-left w-28">Roll No</th>
-                        <th className="px-4 py-3 text-left">Name</th>
+                        <th className="px-4 py-3 text-left">Student</th>
                         <th className="px-4 py-3 text-right">Status</th>
                       </tr>
                     </thead>
@@ -736,10 +748,9 @@ function RegisterEntriesPage() {
                             key={s.id}
                             className={`transition-colors hover:bg-muted/30 ${!isPresent ? "bg-destructive/[0.04]" : ""}`}
                           >
-                            <td className="px-4 py-3 font-mono text-xs text-muted-foreground whitespace-nowrap">
-                              {s.roll_no}
+                            <td className="px-4 py-3">
+                              <RosterIdentity rollNo={s.roll_no} name={s.name} />
                             </td>
-                            <td className="px-4 py-3 font-medium whitespace-nowrap">{s.name}</td>
                             <td className="px-3 py-2.5 text-right">
                               <button
                                 onClick={() => toggleDayStudent(s.id)}
@@ -800,8 +811,7 @@ function RegisterEntriesPage() {
               <table className="w-full text-sm">
                 <thead>
                   <tr className="border-b bg-muted/40 text-[11px] text-muted-foreground font-semibold uppercase tracking-wide">
-                    <th className="px-4 py-3 text-left w-28">Roll No</th>
-                    <th className="px-4 py-3 text-left">Name</th>
+                    <th className="px-4 py-3 text-left">Student</th>
                     <th className="px-4 py-3 text-center hidden sm:table-cell">Present</th>
                     <th className="px-4 py-3 text-center hidden sm:table-cell">Absent</th>
                     <th className="px-4 py-3 text-center hidden md:table-cell">Working Days</th>
@@ -820,7 +830,7 @@ function RegisterEntriesPage() {
                       if (st === "present") present++;
                       else if (st === "absent") absent++;
                     });
-                    const pct = totalWorking > 0 ? Math.round((present / totalWorking) * 100) : 0;
+                    const pct = attendancePct(present, totalWorking);
                     const isAtRisk = pct < 75 && totalWorking > 0;
 
                     return (
@@ -828,14 +838,11 @@ function RegisterEntriesPage() {
                         key={student.id}
                         className={`transition-colors hover:bg-muted/30 ${isAtRisk ? "bg-destructive/[0.03]" : ""}`}
                       >
-                        <td className="px-4 py-3.5 font-mono text-xs text-muted-foreground">
-                          {student.roll_no}
-                        </td>
-                        <td className="px-4 py-3.5 font-medium">
-                          <div className="flex items-center gap-2">
-                            {student.name}
+                        <td className="px-4 py-3.5">
+                          <div className="flex items-center gap-2 min-w-0">
+                            <RosterIdentity rollNo={student.roll_no} name={student.name} emphasis={isAtRisk} />
                             {isAtRisk && (
-                              <span className="hidden sm:inline-flex text-[10px] font-bold text-destructive bg-destructive/10 px-1.5 py-0.5 rounded-full leading-none">
+                              <span className="hidden sm:inline-flex text-[10px] font-bold text-destructive bg-destructive/10 px-1.5 py-0.5 rounded-full leading-none shrink-0">
                                 At Risk
                               </span>
                             )}
@@ -861,13 +868,12 @@ function RegisterEntriesPage() {
                                 className="h-full rounded-full transition-all"
                                 style={{
                                   width: `${pct}%`,
-                                  background:
-                                    pct >= 75 ? "var(--color-success)" : "var(--color-destructive)",
+                                  background: pctBarColor(pct),
                                 }}
                               />
                             </div>
                             <span
-                              className={`text-xs font-bold w-10 text-right ${pct >= 75 ? "text-success" : "text-destructive"}`}
+                              className={`text-xs font-bold w-10 text-right ${pctToneClass(pct)}`}
                             >
                               {pct}%
                             </span>
@@ -1002,10 +1008,7 @@ function RegisterEntriesPage() {
                       if (st === "present") studentPresent++;
                       else if (st === "absent") studentAbsent++;
                     });
-                    const studentPct =
-                      studentWorkingDays > 0
-                        ? Math.round((studentPresent / studentWorkingDays) * 100)
-                        : 0;
+                    const studentPct = attendancePct(studentPresent, studentWorkingDays);
                     const isAtRisk = studentPct < 75 && studentWorkingDays > 0;
 
                     return (

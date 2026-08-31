@@ -4,7 +4,7 @@ import { supabase } from "@/integrations/supabase/client";
 export type MyRole = {
   id: string;
   user_id: string;
-  role: "principal" | "hod" | "incharge";
+  role: "principal" | "hod" | "incharge" | "admin";
   dept_id: string | null;
   class_id: string | null;
 };
@@ -17,6 +17,11 @@ export type ClassWithContext = {
   dept_id: string;
   dept_name: string;
 };
+
+/** Formats a class the way every screen labels it: Dept · Year · Class. */
+export function classLabel(c: ClassWithContext): string {
+  return `${c.dept_name} · ${c.year_label} · ${c.name}`;
+}
 
 export function useMyRoles() {
   return useQuery({
@@ -35,7 +40,7 @@ export function useMyAccessibleClasses() {
     enabled: !!roles,
     queryKey: ["my-classes", roles?.length ?? 0],
     queryFn: async (): Promise<ClassWithContext[]> => {
-      const isPrincipal = roles!.some((r) => r.role === "principal");
+      const isPrincipal = roles!.some((r) => r.role === "principal" || r.role === "admin");
       const hodDepts = roles!.filter((r) => r.role === "hod" && r.dept_id).map((r) => r.dept_id!);
       const inchargeClasses = roles!
         .filter((r) => r.role === "incharge" && r.class_id)

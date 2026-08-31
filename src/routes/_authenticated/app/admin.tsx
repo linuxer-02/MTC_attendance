@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { useMyRoles } from "@/features/shared/roles";
 import { StructureTab } from "@/features/admin/StructureTab";
 import { StaffTab } from "@/features/admin/StaffTab";
@@ -13,18 +13,27 @@ export const Route = createFileRoute("/_authenticated/app/admin")({
 
 type Tab = "structure" | "staff" | "students";
 
-const TABS: { key: Tab; label: string; icon: React.ElementType }[] = [
-  { key: "structure", label: "Structure", icon: Building2 },
-  { key: "staff", label: "Staff", icon: Users },
-  { key: "students", label: "Students", icon: GraduationCap },
-];
-
 function AdminPage() {
   const { data: roles, isLoading } = useMyRoles();
   const isPrincipal = roles?.some((r) => r.role === "principal");
   const isHod = roles?.some((r) => r.role === "hod");
-  const canAccess = isPrincipal || isHod;
-  const [tab, setTab] = useState<Tab>("structure");
+  const isAdminRole = roles?.some((r) => r.role === "admin");
+  // Admin mirrors the principal everywhere except Structure and Staff
+  // (role assignment) — it can't create depts/years/classes or assign roles.
+  // Staff attendance lives on its own page (/app/staff), not here.
+  const canAccess = isPrincipal || isHod || isAdminRole;
+
+  const TABS = useMemo(() => {
+    const tabs: { key: Tab; label: string; icon: React.ElementType }[] = [];
+    if (isPrincipal || isHod) tabs.push({ key: "structure", label: "Structure", icon: Building2 });
+    if (isPrincipal || isHod) tabs.push({ key: "staff", label: "Staff", icon: Users });
+    if (isPrincipal || isHod || isAdminRole)
+      tabs.push({ key: "students", label: "Students", icon: GraduationCap });
+    return tabs;
+  }, [isPrincipal, isHod, isAdminRole]);
+
+  const [tab, setTab] = useState<Tab | null>(null);
+  const activeTab = tab && TABS.some((t) => t.key === tab) ? tab : (TABS[0]?.key ?? "structure");
 
   if (isLoading) {
     return (
@@ -46,7 +55,7 @@ function AdminPage() {
         </div>
         <h2 className="text-3xl display">Access Denied</h2>
         <p className="text-sm text-muted-foreground mt-2 max-w-xs mx-auto">
-          Admin controls are for HODs and the Principal only.
+          Admin controls are for HODs, Admins and the Principal only.
         </p>
       </div>
     );
@@ -68,7 +77,7 @@ function AdminPage() {
             key={t.key}
             onClick={() => setTab(t.key)}
             className={`flex-1 flex items-center justify-center gap-1.5 rounded-xl py-2.5 text-sm font-medium transition-all duration-200 ${
-              tab === t.key
+              activeTab === t.key
                 ? "gradient-primary text-primary-foreground shadow-sm"
                 : "text-muted-foreground hover:text-foreground"
             }`}
@@ -79,9 +88,9 @@ function AdminPage() {
         ))}
       </div>
 
-      {tab === "structure" && <StructureTab isPrincipal={!!isPrincipal} />}
-      {tab === "staff" && <StaffTab isPrincipal={!!isPrincipal} />}
-      {tab === "students" && <StudentsTab />}
+      {activeTab === "structure" && <StructureTab isPrincipal={!!isPrincipal} />}
+      {activeTab === "staff" && <StaffTab isPrincipal={!!isPrincipal} />}
+      {activeTab === "students" && <StudentsTab />}
     </div>
   );
 }

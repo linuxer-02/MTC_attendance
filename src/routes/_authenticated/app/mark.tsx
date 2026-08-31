@@ -1,12 +1,21 @@
-import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
+import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useMemo, useState, useEffect } from "react";
 import { z } from "zod";
 import { supabase } from "@/integrations/supabase/client";
 import { useMyAccessibleClasses } from "@/features/shared/roles";
 import { isSundayISO, prettyDate, todayISO } from "@/features/shared/date";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQuery } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { CheckCircle2, XCircle, CheckCheck, Palmtree, ListChecks } from "lucide-react";
+import { CheckCircle2, XCircle, CheckCheck, Palmtree, ListChecks, Save } from "lucide-react";
+import { ConfirmDialog } from "@/components/shared/ConfirmDialog";
+import { ClassSelect } from "@/components/shared/ClassSelect";
+import { attendancePct, pctBarColor, pctToneClass } from "@/features/shared/attendance";
+import {
+  currentUserId,
+  useAttendanceInvalidator,
+  useClassStudents,
+} from "@/features/shared/attendanceQueries";
+import { qk } from "@/features/shared/queryKeys";
 
 const searchSchema = z.object({ classId: z.string().optional() });
 
@@ -28,25 +37,13 @@ function MarkPage() {
   }, [classes, classId]);
 
   const today = todayISO();
-  const queryClient = useQueryClient();
+  const invalidateAttendance = useAttendanceInvalidator();
 
-  const { data: students } = useQuery({
-    enabled: !!classId,
-    queryKey: ["students", classId],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("students")
-        .select("id, name, roll_no")
-        .eq("class_id", classId!)
-        .order("roll_no");
-      if (error) throw error;
-      return data ?? [];
-    },
-  });
+  const { data: students } = useClassStudents(classId);
 
   const { data: existing, refetch } = useQuery({
     enabled: !!classId,
-    queryKey: ["att-today", classId, today],
+    queryKey: qk.attendance(classId, today, today),
     queryFn: async () => {
       const { data, error } = await supabase
         .from("attendance")
@@ -60,7 +57,7 @@ function MarkPage() {
 
   const { data: holiday } = useQuery({
     enabled: !!classId,
-    queryKey: ["holi-today", classId, today],
+    queryKey: qk.holidays(classId, today, today),
     queryFn: async () => {
       const { data } = await supabase
         .from("class_holidays")
@@ -87,8 +84,7 @@ function MarkPage() {
 
   const saveAllAttendance = async (currentState: Record<string, "present" | "absent">) => {
     if (!classId || !students || students.length === 0) return true;
-    const { data: authData } = await supabase.auth.getUser();
-    const uid = authData.user?.id;
+    const uid = await currentUserId();
     if (!uid) {
       toast.error("Session expired. Please sign in again.");
       return false;
@@ -108,9 +104,7 @@ function MarkPage() {
       return false;
     }
     refetch();
-    queryClient.invalidateQueries({ queryKey: ["att-week"] });
-    queryClient.invalidateQueries({ queryKey: ["att-month-register"] });
-    queryClient.invalidateQueries({ queryKey: ["att-today"] });
+    invalidateAttendance();
     return true;
   };
 
@@ -119,8 +113,7 @@ function MarkPage() {
   // students' already-saved statuses by re-upserting a stale full roster.
   const saveSingleStatus = async (studentId: string, status: "present" | "absent") => {
     if (!classId) return false;
-    const { data: authData } = await supabase.auth.getUser();
-    const uid = authData.user?.id;
+    const uid = await currentUserId();
     if (!uid) {
       toast.error("Session expired. Please sign in again.");
       return false;
@@ -140,9 +133,7 @@ function MarkPage() {
       return false;
     }
     refetch();
-    queryClient.invalidateQueries({ queryKey: ["att-week"] });
-    queryClient.invalidateQueries({ queryKey: ["att-month-register"] });
-    queryClient.invalidateQueries({ queryKey: ["att-today"] });
+    invalidateAttendance();
     return true;
   };
 
@@ -168,24 +159,43 @@ function MarkPage() {
     }
   };
 
-  const handleFinish = async () => {
+  const handleSubmit = async () => {
     if (!classId) return;
     setIsSaving(true);
     const ok = await saveAllAttendance(state);
     setIsSaving(false);
-    if (ok) {
-      navigate({
-        to: "/app/absentees",
-        search: { classId, date: today },
-      });
-    }
+    if (ok) toast.success("Attendance submitted ✓");
+  };
+
+  const goToAbsentees = () => {
+    if (!classId) return;
+    navigate({ to: "/app/absentees", search: { classId, date: today } });
   };
 
   const absent = (students ?? []).filter((s) => (state[s.id] ?? "present") === "absent");
   const presentCount = (students ?? []).length - absent.length;
   const total = students?.length ?? 0;
-  const pct = total > 0 ? Math.round((presentCount / total) * 100) : 0;
+  const pct = attendancePct(presentCount, total);
   const markedCount = total;
+  // Untouched (default-present) students only get persisted once "Submit" is
+  // pressed — if fewer rows exist in the DB than students, this class isn't
+  // fully saved yet, so switching away silently would drop those defaults.
+  const needsSubmitConfirm = !!classId && total > 0 && (existing?.length ?? 0) < total;
+
+  const [pendingClassId, setPendingClassId] = useState<string | null>(null);
+
+  const handleClassChange = (newClassId: string) => {
+    if (needsSubmitConfirm) {
+      setPendingClassId(newClassId);
+      return;
+    }
+    setClassId(newClassId);
+  };
+
+  const confirmClassChange = () => {
+    if (pendingClassId) setClassId(pendingClassId);
+    setPendingClassId(null);
+  };
 
   if (isSundayISO(today)) {
     return (
@@ -214,17 +224,12 @@ function MarkPage() {
         <div className="text-xs text-muted-foreground uppercase tracking-wide font-medium">
           {prettyDate(today)}
         </div>
-        <select
-          value={classId ?? ""}
-          onChange={(e) => setClassId(e.target.value)}
-          className="mt-1.5 w-full rounded-xl border bg-card px-3 py-2.5 text-sm shadow-sm"
-        >
-          {classes?.map((c) => (
-            <option key={c.id} value={c.id}>
-              {c.dept_name} · {c.year_label} · {c.name}
-            </option>
-          ))}
-        </select>
+        <ClassSelect
+          classes={classes}
+          value={classId}
+          onChange={handleClassChange}
+          className="mt-1.5 w-full"
+        />
       </div>
 
       {/* Sticky stats bar */}
@@ -257,17 +262,12 @@ function MarkPage() {
         <div className="h-1.5 w-full bg-muted rounded-full overflow-hidden">
           <div
             className="h-full rounded-full transition-all duration-500"
-            style={{
-              width: `${pct}%`,
-              background: pct >= 75 ? "var(--color-success)" : "var(--color-destructive)",
-            }}
+            style={{ width: `${pct}%`, background: pctBarColor(pct) }}
           />
         </div>
         <div className="flex justify-between text-[10px] text-muted-foreground mt-1">
           <span>Attendance</span>
-          <span className={pct >= 75 ? "text-success font-medium" : "text-destructive font-medium"}>
-            {pct}%
-          </span>
+          <span className={`font-medium ${pctToneClass(pct)}`}>{pct}%</span>
         </div>
       </div>
 
@@ -301,7 +301,7 @@ function MarkPage() {
                       <CheckCircle2 className="h-4 w-4 text-success" />
                     )}
                   </div>
-                  <span className="text-xs font-mono text-muted-foreground min-w-[4.5rem] max-w-[7.5rem] truncate shrink-0">
+                  <span className="text-xs font-mono text-muted-foreground min-w-18 max-w-30 truncate shrink-0">
                     {s.roll_no}
                   </span>
                   <span className="truncate font-medium">{s.name}</span>
@@ -325,16 +325,35 @@ function MarkPage() {
         )}
       </ul>
 
-      {/* Finish button */}
-      <button
-        type="button"
-        onClick={handleFinish}
-        disabled={isSaving}
-        className="w-full flex items-center justify-center gap-2 rounded-2xl gradient-primary text-primary-foreground py-4 text-sm font-medium shadow-lg btn-press disabled:opacity-50"
-      >
-        <ListChecks className="h-4 w-4" />
-        {isSaving ? "Saving register..." : "Finish · View absentees"}
-      </button>
+      {/* Submit + View absentees — separate actions */}
+      <div className="grid grid-cols-2 gap-2">
+        <button
+          type="button"
+          onClick={handleSubmit}
+          disabled={isSaving}
+          className="flex items-center justify-center gap-2 rounded-2xl gradient-primary text-primary-foreground py-4 text-sm font-medium shadow-lg btn-press disabled:opacity-50"
+        >
+          <Save className="h-4 w-4" />
+          {isSaving ? "Submitting..." : "Submit"}
+        </button>
+        <button
+          type="button"
+          onClick={goToAbsentees}
+          className="flex items-center justify-center gap-2 rounded-2xl border bg-card text-foreground py-4 text-sm font-medium shadow-sm btn-press hover:bg-muted/60 transition-colors"
+        >
+          <ListChecks className="h-4 w-4" />
+          View Absentees
+        </button>
+      </div>
+
+      <ConfirmDialog
+        open={!!pendingClassId}
+        onOpenChange={(open) => !open && setPendingClassId(null)}
+        title="Unsubmitted attendance"
+        description="You haven't submitted attendance for this class yet. Switch to another class anyway?"
+        confirmLabel="Switch anyway"
+        onConfirm={confirmClassChange}
+      />
     </div>
   );
 }

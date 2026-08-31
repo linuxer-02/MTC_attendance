@@ -8,6 +8,10 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { Palmtree, CalendarCheck2, Trash2, CalendarX2 } from "lucide-react";
 import { format, startOfMonth, endOfMonth, parseISO } from "date-fns";
+import { useHolidayInvalidator, currentUserId } from "@/features/shared/attendanceQueries";
+import { qk } from "@/features/shared/queryKeys";
+import { ClassSelect } from "@/components/shared/ClassSelect";
+import { ConfirmDialog } from "@/components/shared/ConfirmDialog";
 
 const searchSchema = z.object({ classId: z.string().optional() });
 export const Route = createFileRoute("/_authenticated/app/holiday")({
@@ -24,6 +28,7 @@ function HolidayPage() {
   const [reason, setReason] = useState("");
   const [saving, setSaving] = useState(false);
   const [removing, setRemoving] = useState<string | null>(null);
+  const [unmarkTarget, setUnmarkTarget] = useState<{ id: string; date: string } | null>(null);
   const nav = useNavigate();
   const qc = useQueryClient();
 
@@ -34,7 +39,7 @@ function HolidayPage() {
   // Live check: is the selected date already a holiday?
   const { data: existingHoliday, refetch: refetchExisting } = useQuery({
     enabled: !!classId && !!date,
-    queryKey: ["holiday-check", classId, date],
+    queryKey: qk.holidays(classId, date, date),
     queryFn: async () => {
       const { data } = await supabase
         .from("class_holidays")
@@ -52,7 +57,7 @@ function HolidayPage() {
 
   const { data: monthHolidays, refetch: refetchMonth } = useQuery({
     enabled: !!classId,
-    queryKey: ["holidays-month", classId, monthStart, monthEnd],
+    queryKey: qk.holidays(classId, monthStart, monthEnd),
     queryFn: async () => {
       const { data, error } = await supabase
         .from("class_holidays")
@@ -66,12 +71,12 @@ function HolidayPage() {
     },
   });
 
+  // Covers both the legacy prefixes (screens not yet migrated) and the new
+  // `qk` roots read by Mark/Analytics. See REFACTOR_PLAN.md step 1.
+  const invalidateHolidays = useHolidayInvalidator();
+
   const invalidateAll = () => {
-    qc.invalidateQueries({ queryKey: ["holiday-check"] });
-    qc.invalidateQueries({ queryKey: ["holidays-month"] });
-    qc.invalidateQueries({ queryKey: ["holi-week"] });
-    qc.invalidateQueries({ queryKey: ["holi-month"] });
-    qc.invalidateQueries({ queryKey: ["holi-month-register"] });
+    invalidateHolidays();
     refetchExisting();
     refetchMonth();
   };
@@ -85,8 +90,7 @@ function HolidayPage() {
     if (!trimmedReason) return toast.error("Please provide a reason for the holiday.");
     if (trimmedReason.length > 200) return toast.error("Reason must be 200 characters or less.");
 
-    const { data: authData } = await supabase.auth.getUser();
-    const uid = authData.user?.id;
+    const uid = await currentUserId();
     if (!uid) return toast.error("Session expired. Please sign in again.");
 
     setSaving(true);
@@ -103,9 +107,14 @@ function HolidayPage() {
     invalidateAll();
   };
 
-  const unmark = async (id: string, dateStr: string) => {
-    if (!confirm(`Remove holiday on ${prettyDate(dateStr)}? Attendance may need to be re-marked.`))
-      return;
+  const triggerUnmark = (id: string, dateStr: string) => {
+    setUnmarkTarget({ id, date: dateStr });
+  };
+
+  const confirmUnmark = async () => {
+    if (!unmarkTarget) return;
+    const { id, date: dateStr } = unmarkTarget;
+    setUnmarkTarget(null);
     setRemoving(id);
     const { error } = await supabase.from("class_holidays").delete().eq("id", id);
     setRemoving(null);
@@ -129,17 +138,12 @@ function HolidayPage() {
           <label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
             Class
           </label>
-          <select
-            value={classId ?? ""}
-            onChange={(e) => setClassId(e.target.value)}
-            className="mt-1.5 w-full rounded-xl border bg-background px-3 py-2.5 text-sm"
-          >
-            {classes?.map((c) => (
-              <option key={c.id} value={c.id}>
-                {c.dept_name} · {c.year_label} · {c.name}
-              </option>
-            ))}
-          </select>
+          <ClassSelect
+            classes={classes}
+            value={classId}
+            onChange={setClassId}
+            className="mt-1.5 w-full"
+          />
         </div>
 
         {/* Date */}
@@ -167,7 +171,7 @@ function HolidayPage() {
               </div>
               <button
                 type="button"
-                onClick={() => unmark(existingHoliday.id, date)}
+                onClick={() => triggerUnmark(existingHoliday.id, date)}
                 disabled={removing === existingHoliday.id}
                 className="flex items-center gap-1 text-xs text-destructive font-medium hover:underline ml-2 shrink-0 btn-press"
               >
@@ -230,7 +234,7 @@ function HolidayPage() {
                   <span className="truncate text-sm font-medium">{h.reason}</span>
                 </div>
                 <button
-                  onClick={() => unmark(h.id, h.date)}
+                  onClick={() => triggerUnmark(h.id, h.date)}
                   disabled={removing === h.id}
                   className="flex items-center gap-1 text-xs text-destructive hover:bg-destructive/10 px-2 py-1 rounded-lg transition-colors shrink-0 btn-press"
                   title="Remove holiday"
@@ -250,6 +254,20 @@ function HolidayPage() {
           date. Sundays are automatically treated as holidays.
         </p>
       </div>
+
+      <ConfirmDialog
+        open={!!unmarkTarget}
+        onOpenChange={(open) => !open && setUnmarkTarget(null)}
+        title="Remove Holiday?"
+        description={
+          unmarkTarget
+            ? `Remove holiday on ${prettyDate(unmarkTarget.date)}? Attendance may need to be re-marked.`
+            : ""
+        }
+        confirmLabel="Remove"
+        destructive
+        onConfirm={confirmUnmark}
+      />
     </div>
   );
 }

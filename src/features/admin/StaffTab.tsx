@@ -5,7 +5,7 @@ import { useState } from "react";
 import { toast } from "sonner";
 import { Trash2, Shield, Plus, Building2, BookOpen } from "lucide-react";
 
-type AppRole = "principal" | "hod" | "incharge";
+type AppRole = "principal" | "hod" | "incharge" | "admin";
 
 export function StaffTab({ isPrincipal }: { isPrincipal: boolean }) {
   const qc = useQueryClient();
@@ -45,10 +45,13 @@ export function StaffTab({ isPrincipal }: { isPrincipal: boolean }) {
   const assign = async () => {
     if (!userId) return toast.error("Pick a staff member");
 
-    // Security: only principals can assign HOD roles
+    // Security: only principals can assign HOD/Admin roles
     const currentIsPrincipal = roles?.some((r) => r.role === "principal");
     if (role === "hod" && !currentIsPrincipal) {
       return toast.error("Only the Principal can assign HOD roles.");
+    }
+    if (role === "admin" && !currentIsPrincipal) {
+      return toast.error("Only the Principal can assign Admin roles.");
     }
     if (role === "principal") {
       return toast.error("Principal roles cannot be assigned from this panel.");
@@ -111,21 +114,22 @@ export function StaffTab({ isPrincipal }: { isPrincipal: boolean }) {
           </select>
 
           <div className="flex gap-1.5 rounded-xl border bg-background p-1.5 text-sm">
-            {(isPrincipal ? (["hod", "incharge"] as AppRole[]) : (["incharge"] as AppRole[])).map(
-              (r) => (
-                <button
-                  key={r}
-                  onClick={() => setRole(r)}
-                  className={`flex-1 rounded-lg py-2 capitalize transition-colors ${
-                    role === r
-                      ? "bg-primary text-primary-foreground shadow-sm font-medium"
-                      : "text-muted-foreground hover:bg-muted"
-                  }`}
-                >
-                  {r === "hod" ? "HOD" : r}
-                </button>
-              ),
-            )}
+            {(isPrincipal
+              ? (["hod", "incharge", "admin"] as AppRole[])
+              : (["incharge"] as AppRole[])
+            ).map((r) => (
+              <button
+                key={r}
+                onClick={() => setRole(r)}
+                className={`flex-1 rounded-lg py-2 capitalize transition-colors ${
+                  role === r
+                    ? "bg-primary text-primary-foreground shadow-sm font-medium"
+                    : "text-muted-foreground hover:bg-muted"
+                }`}
+              >
+                {r === "hod" ? "HOD" : r}
+              </button>
+            ))}
           </div>
 
           {role === "hod" && (
@@ -200,9 +204,11 @@ export function StaffTab({ isPrincipal }: { isPrincipal: boolean }) {
                         className={`text-[10px] uppercase tracking-wide font-bold px-1.5 py-0.5 rounded ${
                           r.role === "principal"
                             ? "bg-accent/15 text-accent"
-                            : r.role === "hod"
-                              ? "bg-primary/15 text-primary"
-                              : "bg-success/15 text-success"
+                            : r.role === "admin"
+                              ? "bg-destructive/15 text-destructive"
+                              : r.role === "hod"
+                                ? "bg-primary/15 text-primary"
+                                : "bg-success/15 text-success"
                         }`}
                       >
                         {r.role}

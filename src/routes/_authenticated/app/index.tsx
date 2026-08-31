@@ -1,10 +1,15 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
-import { supabase } from "@/integrations/supabase/client";
 import { useMyAccessibleClasses } from "@/features/shared/roles";
 import { currentWeekDays, isSundayISO, prettyDate, todayISO } from "@/features/shared/date";
-import { useQuery } from "@tanstack/react-query";
 import { CalendarCheck2, ChevronRight, Palmtree, Pencil, BarChart2 } from "lucide-react";
+import { ClassSelect } from "@/components/shared/ClassSelect";
+import { StatTiles } from "@/components/shared/StatTiles";
+import {
+  useClassStudents,
+  useClassAttendance,
+  useClassHolidays,
+} from "@/features/shared/attendanceQueries";
 
 export const Route = createFileRoute("/_authenticated/app/")({
   head: () => ({ meta: [{ title: "This week — Smart Attend Hub" }] }),
@@ -22,54 +27,9 @@ function WeekView() {
   const from = week[0].date;
   const to = week[6].date;
 
-  const { data: students } = useQuery({
-    enabled: !!classId,
-    queryKey: ["students", classId],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("students")
-        .select("id, name, roll_no")
-        .eq("class_id", classId!)
-        .order("roll_no");
-      if (error) throw error;
-      return data ?? [];
-    },
-  });
-
-  const { data: attendance } = useQuery({
-    enabled: !!classId,
-    queryKey: ["att-week", classId, from, to],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("attendance")
-        .select("student_id, date, status")
-        .eq("class_id", classId!)
-        .gte("date", from)
-        .lte("date", to);
-      if (error) throw error;
-      return data ?? [];
-    },
-  });
-
-  const { data: holidays } = useQuery({
-    enabled: !!classId,
-    queryKey: ["holi-week", classId, from, to],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("class_holidays")
-        .select("date, reason")
-        .eq("class_id", classId!)
-        .gte("date", from)
-        .lte("date", to);
-      if (error) throw error;
-      return data ?? [];
-    },
-  });
-
-  const holidayMap = useMemo(
-    () => Object.fromEntries((holidays ?? []).map((h) => [h.date, h.reason])),
-    [holidays],
-  );
+  const { data: students } = useClassStudents(classId);
+  const { data: attendance } = useClassAttendance(classId, from, to);
+  const { data: holidays } = useClassHolidays(classId, from, to);
 
   const attMap = useMemo(() => {
     const m = new Map<string, "present" | "absent">();
@@ -85,7 +45,7 @@ function WeekView() {
     let totalPresent = 0;
     const total = students?.length ?? 0;
     week.forEach((d) => {
-      if (d.sunday || holidayMap[d.date]) return;
+      if (d.sunday || holidays?.has(d.date)) return;
       (students ?? []).forEach((s) => {
         const st = attMap.get(`${s.id}|${d.date}`);
         if (st === "present") {
@@ -95,7 +55,7 @@ function WeekView() {
       });
     });
     return { totalPresent, totalMarked, total };
-  }, [week, students, attMap, holidayMap]);
+  }, [week, students, attMap, holidays]);
 
   if (isLoading) {
     return (
@@ -123,17 +83,12 @@ function WeekView() {
     <div className="space-y-5 animate-slide-up">
       {/* Class selector */}
       <div className="flex items-center gap-2">
-        <select
-          value={classId ?? ""}
-          onChange={(e) => setClassId(e.target.value)}
-          className="flex-1 min-w-0 rounded-xl border bg-card px-3 py-2.5 text-sm shadow-sm"
-        >
-          {classes.map((c) => (
-            <option key={c.id} value={c.id}>
-              {c.dept_name} · {c.year_label} · {c.name}
-            </option>
-          ))}
-        </select>
+        <ClassSelect
+          classes={classes}
+          value={classId}
+          onChange={setClassId}
+          className="flex-1 min-w-0"
+        />
         <Link
           to="/app/analytics"
           className="p-2.5 rounded-xl border bg-card text-muted-foreground hover:text-foreground hover:bg-muted/60 transition-all shadow-sm shrink-0 btn-press"
@@ -153,13 +108,13 @@ function WeekView() {
 
       {/* Weekly stats pills */}
       {weekStats.totalMarked > 0 && (
-        <div className="grid grid-cols-3 gap-2 stagger-children">
-          {[
-            { label: "Present", value: weekStats.totalPresent, color: "text-success" },
+        <StatTiles
+          tiles={[
+            { label: "Present", value: weekStats.totalPresent, tone: "text-success" },
             {
               label: "Absent",
               value: weekStats.totalMarked - weekStats.totalPresent,
-              color: "text-destructive",
+              tone: "text-destructive",
             },
             {
               label: "Avg %",
@@ -167,20 +122,10 @@ function WeekView() {
                 weekStats.totalMarked > 0
                   ? Math.round((weekStats.totalPresent / weekStats.totalMarked) * 100) + "%"
                   : "—",
-              color: "text-primary",
+              tone: "text-primary",
             },
-          ].map((s) => (
-            <div
-              key={s.label}
-              className="rounded-xl border bg-card p-3 text-center shadow-sm card-hover animate-slide-up"
-            >
-              <div className={`text-2xl display font-bold ${s.color}`}>{s.value}</div>
-              <div className="text-[10px] uppercase text-muted-foreground mt-0.5 tracking-wide">
-                {s.label}
-              </div>
-            </div>
-          ))}
-        </div>
+          ]}
+        />
       )}
 
       {/* Weekly grid */}
@@ -191,7 +136,7 @@ function WeekView() {
         </h2>
         <div className="grid grid-cols-7 gap-1.5 stagger-children">
           {week.map((d) => {
-            const isHoliday = !!holidayMap[d.date];
+            const isHoliday = holidays?.has(d.date);
             const isSun = d.sunday;
             let absentCount = 0,
               presentCount = 0;
@@ -226,7 +171,7 @@ function WeekView() {
                 {isSun ? (
                   <div className="text-[9px] text-muted-foreground mt-1">Sun</div>
                 ) : isHoliday ? (
-                  <div className="text-[9px] mt-1 text-accent" title={holidayMap[d.date]}>
+                  <div className="text-[9px] mt-1 text-accent" title="Holiday">
                     <Palmtree className="h-3 w-3 mx-auto" />
                   </div>
                 ) : pct !== null ? (
@@ -262,10 +207,10 @@ function WeekView() {
             <div className="text-3xl mb-2">🌴</div>
             Sunday — rest day, no attendance.
           </div>
-        ) : holidayMap[today] ? (
+        ) : holidays?.has(today) ? (
           <div className="rounded-2xl bg-accent/10 border border-accent/20 p-5 text-center">
             <div className="text-3xl mb-2">🎉</div>
-            <p className="text-sm font-medium">Holiday: {holidayMap[today]}</p>
+            <p className="text-sm font-medium">Holiday</p>
           </div>
         ) : (
           <Link

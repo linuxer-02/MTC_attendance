@@ -91,6 +91,68 @@ export type Database = {
           },
         ];
       };
+      staff_attendance: {
+        Row: {
+          created_at: string;
+          date: string;
+          id: string;
+          marked_by: string | null;
+          staff_id: string;
+          status: Database["public"]["Enums"]["staff_attendance_status"];
+          updated_at: string;
+        };
+        Insert: {
+          created_at?: string;
+          date: string;
+          id?: string;
+          marked_by?: string | null;
+          staff_id: string;
+          status: Database["public"]["Enums"]["staff_attendance_status"];
+          updated_at?: string;
+        };
+        Update: {
+          created_at?: string;
+          date?: string;
+          id?: string;
+          marked_by?: string | null;
+          staff_id?: string;
+          status?: Database["public"]["Enums"]["staff_attendance_status"];
+          updated_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "staff_attendance_staff_id_fkey";
+            columns: ["staff_id"];
+            isOneToOne: false;
+            referencedRelation: "staff_members";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      staff_members: {
+        Row: {
+          created_at: string;
+          department: string | null;
+          designation: string | null;
+          id: string;
+          name: string;
+        };
+        Insert: {
+          created_at?: string;
+          department?: string | null;
+          designation?: string | null;
+          id?: string;
+          name: string;
+        };
+        Update: {
+          created_at?: string;
+          department?: string | null;
+          designation?: string | null;
+          id?: string;
+          name?: string;
+        };
+        Relationships: [];
+      };
       classes: {
         Row: {
           created_at: string;
@@ -283,10 +345,19 @@ export type Database = {
       hod_dept_ids: { Args: { _user_id: string }; Returns: string[] };
       incharge_class_ids: { Args: { _user_id: string }; Returns: string[] };
       is_principal: { Args: { _user_id: string }; Returns: boolean };
+      is_principal_or_admin: { Args: { _user_id: string }; Returns: boolean };
     };
     Enums: {
-      app_role: "principal" | "hod" | "incharge";
+      app_role: "principal" | "hod" | "incharge" | "admin";
       attendance_status: "present" | "absent";
+      staff_attendance_status:
+        | "present"
+        | "absent"
+        | "on_duty"
+        | "medical_leave"
+        | "casual_leave"
+        | "half_day_leave"
+        | "late_arrival";
     };
     CompositeTypes: {
       [_ in never]: never;
@@ -408,8 +479,17 @@ export type CompositeTypes<
 export const Constants = {
   public: {
     Enums: {
-      app_role: ["principal", "hod", "incharge"],
+      app_role: ["principal", "hod", "incharge", "admin"],
       attendance_status: ["present", "absent"],
+      staff_attendance_status: [
+        "present",
+        "absent",
+        "on_duty",
+        "medical_leave",
+        "casual_leave",
+        "half_day_leave",
+        "late_arrival",
+      ],
     },
   },
 } as const;
